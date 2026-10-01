@@ -12,7 +12,19 @@ import '../admin/AdminForm.css';
 /* ── Helpers ─────────────────────────────────────── */
 function validateUrl(url) {
   if (!url || !url.trim()) return 'Photo is required.';
-  if (!/^https?:\/\/.+/.test(url)) return 'Photo URL must start with http:// or https://';
+  const trimmed = url.trim();
+  // Accept three shapes:
+  //   1. Absolute URL  — http:// or https:// (Cloudinary, Unsplash, etc.)
+  //   2. Protocol-less — //cdn.example.com/x.jpg
+  //   3. Site-relative — /images/gallery/G001.jpg (files served from React
+  //      app's public/ folder in dev, and bundled into the static site
+  //      in prod build). This is the canonical shape for the seeded
+  //      gallery photos.
+  const looksLikeUrl =
+    /^https?:\/\/.+/.test(trimmed) ||
+    /^\/\/[^/]+/.test(trimmed) ||
+    /^\/[^\s]+/.test(trimmed);
+  if (!looksLikeUrl) return 'Photo must be an absolute URL (http/https) or a site-relative path (starting with /).';
   return null;
 }
 
@@ -230,11 +242,11 @@ function GalleryFormModal({ show, editing, initial, programmes, onSave, onClose 
                       type="text"
                       value={form.category}
                       onChange={set('category')}
-                      placeholder="e.g. Education, Healthcare, Events"
+                      placeholder="e.g. education, health, community"
                       list="category-suggestions"
                     />
                     <datalist id="category-suggestions">
-                      {['Education','Healthcare','Community','Events','Volunteer','Training'].map((c) => (
+                      {['education','health','clean water','community','relief','environment','portraits','events'].map((c) => (
                         <option key={c} value={c} />
                       ))}
                     </datalist>
@@ -381,27 +393,39 @@ function GalleryFormModal({ show, editing, initial, programmes, onSave, onClose 
 /* ── Admin Gallery Page ───────────────────────────── */
 function AdminGalleryPage() {
   const { user } = useAuth();
-  const canAccess = user?.role === 'Admin' || user?.role === 'SuperAdmin';
+  const canAccess = user?.role === 'Admin';
 
   const [items, setItems] = useState([]);
   const [categories, setCategories] = useState([]);
   const [programmes, setProgrammes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState(null);
 
+  // Auto-dismiss success messages after 4s so the UI doesn't keep old
+  // success text lingering across operations.
+  useEffect(() => {
+    if (!success) return undefined;
+    const t = setTimeout(() => setSuccess(null), 4000);
+    return () => clearTimeout(t);
+  }, [success]);
+
   const fetchItems = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       const res = await galleryService.getAll({ pageSize: 100, page: 1 });
-      if (res.success) setItems(res.data?.items || []);
-    } catch {
-      setError('Failed to load gallery items.');
+      setItems(res?.items || []);
+    } catch (err) {
+      setError(
+        err?.message ||
+        'Failed to load gallery items.'
+      );
     } finally {
       setLoading(false);
     }
@@ -413,8 +437,8 @@ function AdminGalleryPage() {
         galleryService.getCategories(),
         galleryService.getProgrammes(),
       ]);
-      if (catRes.success) setCategories(catRes.data || []);
-      if (progRes.success) setProgrammes(progRes.data || []);
+      setCategories(Array.isArray(catRes) ? catRes : (catRes?.items || []));
+      setProgrammes(Array.isArray(progRes) ? progRes : (progRes?.items || []));
     } catch { /* non-fatal */ }
   }, []);
 
@@ -430,6 +454,7 @@ function AdminGalleryPage() {
     //   - upload-create:  POST /gallery/upload (multipart, new file, no existing id)
     //   - upload-replace: PUT  /gallery/{id}/upload (multipart, file replaces, server deletes old file)
     //   - json:           POST/PUT /gallery (JSON body, URL passthrough, backward compat)
+    const wasEditing = !!saveOp.editingId;
     try {
       if (saveOp.kind === 'upload-create') {
         await galleryService.uploadFile(saveOp.formData);
@@ -443,11 +468,12 @@ function AdminGalleryPage() {
         }
       }
       setShowForm(false);
+      setSuccess(wasEditing ? 'Gallery item updated.' : 'Gallery item added.');
+      setError(null);
       fetchItems();
       fetchMeta();
     } catch (err) {
       // Re-throw so the modal can show the error inline.
-      // (Already cleared setShowForm(false) above? No — we DON'T close on error.)
       throw err;
     }
   };
@@ -456,9 +482,17 @@ function AdminGalleryPage() {
     if (!deleteConfirm) return;
     try {
       await galleryService.remove(deleteConfirm);
+      setSuccess('Gallery item deleted.');
+      setError(null);
+    } catch (err) {
+      setError(
+        err?.message ||
+        'Failed to delete gallery item.'
+      );
     } finally {
       setDeleteConfirm(null);
       fetchItems();
+      fetchMeta();
     }
   };
 
@@ -486,6 +520,7 @@ function AdminGalleryPage() {
       title="Gallery"
       sub="Upload and manage gallery photos. Link images to programmes for organized viewing."
       error={error}
+      success={success}
       actions={
         <button type="button" className="af-btn af-btn-primary" onClick={openAdd}>
           <i className="bi bi-plus-circle" aria-hidden="true"></i>
@@ -589,7 +624,7 @@ function AdminGalleryPage() {
                       <button type="button" className="af-icon-btn" onClick={() => openEdit(item)} title="Edit" aria-label="Edit">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                       </button>
-                      {user?.role === 'SuperAdmin' && (
+                      {user?.role === 'Admin' && (
                         <button type="button" className="af-icon-btn danger" onClick={() => setDeleteConfirm(item.galleryId)} title="Delete" aria-label="Delete">
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
                         </button>

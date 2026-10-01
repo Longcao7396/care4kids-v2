@@ -8,12 +8,16 @@
 | Requirement       | Version            | How to check                              |
 |-------------------|--------------------|-------------------------------------------|
 | Windows           | 10/11              | `winver`                                  |
-| .NET SDK          | 8.0+               | `dotnet --version`                        |
-| Node.js           | 18 LTS or 20 LTS   | `node -v`                                 |
+| .NET SDK          | **10.0** (project targets `net10.0` — older SDKs will fail) | `dotnet --version` |
+| Node.js           | 18 LTS, 20 LTS, or 22+ (tested on v24.18.0) | `node -v`           |
 | npm               | 9+                 | `npm -v`                                  |
-| SQL Server        | LocalDB (recommended) or Express 2019+ | `sqlcmd -S "(localdb)\MSSQLLocalDB" -Q "SELECT @@VERSION"` |
-| Git               | 2.40+              | `git --version`                           |
-| Visual Studio / Rider / VS Code | 2022 17.8+ / 2024.1+ | `where.exe devenv`            |
+| **SQL Server LocalDB** | **2022/2025 (REQUIRED — not bundled with .NET SDK)** | `sqllocaldb versions` |
+| Git               | 2.40+ (optional, only if cloning via git) | `git --version`  |
+| Visual Studio / Rider / VS Code | optional (only for editing C# code) | `where.exe devenv` |
+
+> ⚠ **SQL Server LocalDB must be installed separately.** It does **not** ship with
+> the .NET SDK. See `INSTALL.md` §1 for the three install paths
+> (SQL Server Express, VS Installer component, or `SqlLocalDB.msi`).
 
 ## 2. First-time Setup
 
@@ -58,7 +62,7 @@ dotnet build GiveAID.V2.slnx
 ### 2.3. Frontend
 
 ```powershell
-cd "C:\Users\admin\Desktop\project NGO\GiveAID.Client"
+cd "<REPO_ROOT>/GiveAID.Client"
 npm install --no-audit --no-fund
 ```
 
@@ -83,7 +87,7 @@ dotnet run --project src/Web/GiveAID.V2.Web.csproj
 ### Terminal 3 — React Client
 
 ```powershell
-cd "C:\Users\admin\Desktop\project NGO\GiveAID.Client"
+cd "<REPO_ROOT>/GiveAID.Client"
 npm start
 # Listens on http://localhost:3000
 ```
@@ -108,12 +112,13 @@ If any of these fail, jump to **Troubleshooting** below.
 
 ## 5. Default Credentials
 
-| Role   | Email                  | Password    |
-|--------|------------------------|-------------|
-| Admin  | admin@give-aid.org     | Admin@123   |
-| User   | user@give-aid.org      | User@123    |
+| Role   | Username | Password    | Email                |
+|--------|----------|-------------|----------------------|
+| Admin  | admin    | Admin@123   | admin@give-aid.org   |
+| User   | demo     | Demo@123    | demo@give-aid.org    |
 
-> **Change these in production.** See `src/Infrastructure/Persistence/Seed/DatabaseSeeder.cs`.
+> **Change these in production.** See `src/Infrastructure/Persistence/Seed/SeedData.cs`.
+> Login requires **username**, not email.
 
 ## 6. Useful URLs
 
@@ -145,7 +150,7 @@ $home = curl.exe -s -o $null -w "%{http_code}" http://localhost:3000
 Write-Host "React homepage: $home"
 
 # Run all tests
-cd "C:\Users\admin\Desktop\project NGO.v2"
+cd "<REPO_ROOT>"
 dotnet test GiveAID.V2.slnx --no-build --logger "console;verbosity=quiet"
 ```
 

@@ -374,9 +374,27 @@
 }
 
 .dp-user-activity-meta .badge {
-  font-size: 10px !important;
-  padding: 2px 8px !important;
-  margin-right: 4px;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.04em;
+  padding: 4px 10px !important;
+  margin-right: 6px;
+  text-transform: uppercase;
+  border: 1px solid transparent;
+}
+
+/* Brighter "Upcoming" badge in the activity list */
+.dp-user-activity-meta .badge.badge-teal {
+  background-color: #14b8a6 !important;
+  color: #ffffff !important;
+  border-color: #0f8b80 !important;
+}
+
+/* Brighter "Active" badge in the activity list */
+.dp-user-activity-meta .badge.badge-neutral {
+  background-color: #334155 !important;
+  color: #ffffff !important;
+  border-color: #1e293b !important;
 }
 
 .dp-user-activity-amount {

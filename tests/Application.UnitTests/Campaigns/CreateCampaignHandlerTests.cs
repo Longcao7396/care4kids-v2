@@ -3,6 +3,7 @@ using FluentValidation;
 using FluentValidation.Results;
 using GiveAID.Application.Features.Campaigns.Commands.Create;
 using GiveAID.Application.Features.Campaigns.DTOs;
+using GiveAID.Application.Services;
 using GiveAID.Application.Common.Interfaces;
 using GiveAID.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -14,11 +15,13 @@ public class CreateCampaignHandlerTests
 {
     private readonly Mock<IApplicationDbContext> _contextMock;
     private readonly Mock<IValidator<CreateCampaignCommand>> _validatorMock;
+    private readonly Mock<ICacheService> _cacheServiceMock;
 
     public CreateCampaignHandlerTests()
     {
         _contextMock = new Mock<IApplicationDbContext>();
         _validatorMock = new Mock<IValidator<CreateCampaignCommand>>();
+        _cacheServiceMock = new Mock<ICacheService>();
         // Default: validation always passes
         _validatorMock
             .Setup(v => v.ValidateAsync(It.IsAny<CreateCampaignCommand>(), It.IsAny<CancellationToken>()))
@@ -26,7 +29,7 @@ public class CreateCampaignHandlerTests
     }
 
     private CreateCampaignCommandHandler BuildHandler() =>
-        new(_contextMock.Object, _validatorMock.Object);
+        new(_contextMock.Object, _validatorMock.Object, _cacheServiceMock.Object);
 
     [Fact]
     public async Task Handle_ValidCommand_CampaignNameIsSet()

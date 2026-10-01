@@ -23,9 +23,7 @@ const ContactPage = () => {
     (async () => {
       try {
         const response = await api.get('/cms/pages/contact_info');
-        if (!cancelled && response.data.success) {
-          setCmsPage(response.data.data);
-        }
+        if (!cancelled) setCmsPage(response || null);
       } catch {
         // Non-fatal
       } finally {
@@ -52,51 +50,44 @@ const ContactPage = () => {
     setLoading(true);
 
     try {
-      const response = await contactService.submit(formData);
-      if (response.success) {
-        setSuccess(response.message || 'Thank you for contacting us. We will get back to you within 2 business days.');
-        setFormData({ name: '', email: '', phone: '', subject: '', message: '' });
-      } else {
-        setError(response.message || 'Failed to send message. Please try again.');
-      }
+      // api.js rejects whenever the envelope reports success === false, so
+      // reaching this line means the submission was accepted.
+      await contactService.submit(formData);
+      setSuccess('Thank you for contacting us. We will get back to you within 2 business days.');
+      setFormData({ name: '', email: '', phone: '', subject: '', message: '' });
     } catch (err) {
-      const msg = err.response?.data?.Message || err.response?.data?.message || 'Failed to send message. Please try again later.';
+      const msg = err.response?.data?.Message || err.response?.data?.message || err.message || 'Failed to send message. Please try again later.';
       setError(msg);
     } finally {
       setLoading(false);
     }
   };
 
-  // Default contact info
-  const defaultContact = {
-    address: '123 Charity Street\nDistrict 1, Ho Chi Minh City\nVietnam',
-    phone: '1800-123-456',
-    email: 'info@care4kids.org',
-    hours: 'Mon–Fri: 9am–6pm (GMT+7)'
-  };
+  // Safe placeholder shown only if the CMS contact_info page fails to load.
+  // Intentionally non-specific: no invented phone, email, or address.
+  const fallbackNotice =
+    'Our full contact details will appear here once the admin has published them. In the meantime, please use the form below and our team will respond by email.';
 
-  // Contact info cards
+  // Contact info cards. Each channel renders a static label and icon, but
+  // the actual contact details (when present) come from the CMS contact_info
+  // page so there is one source of truth. If CMS data is missing, we show a
+  // generic placeholder instead of inventing a phone/email/address.
   const contactChannels = [
-    {
-      icon: (
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-      ),
-      title: 'Visit Us',
-      lines: ['123 Charity Street', 'District 1, Ho Chi Minh City', 'Vietnam']
-    },
-    {
-      icon: (
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-      ),
-      title: 'Call Us',
-      lines: [defaultContact.phone, defaultContact.hours]
-    },
     {
       icon: (
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
       ),
       title: 'Email Us',
-      lines: [defaultContact.email, 'We reply within 2 business days']
+      lines: cmsPage?.content
+        ? ['See the contact information panel for our email address.']
+        : [fallbackNotice]
+    },
+    {
+      icon: (
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>
+      ),
+      title: 'Response Time',
+      lines: ['We aim to respond within 2 business days.']
     }
   ];
 
@@ -267,23 +258,6 @@ const ContactPage = () => {
                     />
                   </div>
                 )}
-
-                <div className="cp-map-card">
-                  <p className="eyebrow">Find Us</p>
-                  <h3 className="cp-map-title">Ho Chi Minh City Office</h3>
-                  <div className="cp-map">
-                    <a 
-                      href="https://maps.app.goo.gl/gnP5Hu95CLuoiq6w9"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="cp-map-link"
-                    >
-                      <i className="bi bi-geo-alt-fill"></i>
-                      <span>Mở trong Google Maps</span>
-                      <i className="bi bi-box-arrow-up-right"></i>
-                    </a>
-                  </div>
-                </div>
               </div>
             </Col>
           </Row>

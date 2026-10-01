@@ -34,13 +34,22 @@ with EF6, IIS Express, and inline ADO.NET calls) with a Clean Architecture solut
                      ┌────────────────────▼────────────────────┐
                      │   Infrastructure Layer                  │
                      │  EF Core · JWT · Email · Stripe · Cache │
+                     │  Soft Delete + Audit Log intercept      │
+                     │  (SaveChangesAsync → audit_logs sidecar) │
                      └────────────────────┬────────────────────┘
                                           │
                      ┌────────────────────▼────────────────────┐
                      │       Domain Layer (pure POCOs)         │
                      │   Entities · Value Objects · Enums      │
+                     │   (BaseEntity: IsDeleted, DeletedAt)    │
                      └─────────────────────────────────────────┘
 ```
+
+> The **Infrastructure** box hides a small but important detail: every
+> `SaveChangesAsync` call goes through the `GiveAIDDbContext` override that
+> (a) intercepts hard deletes and converts them to soft deletes, and (b)
+> emits one `AuditLog` row per entity change into the append-only
+> `audit_logs` table. See [§6.1 Data Protection Patterns](#61-data-protection-patterns).
 
 ## 3. Dependency Rules
 
@@ -95,7 +104,8 @@ logging. The domain knows nothing about persistence, transport, or frameworks.
 | `CmsPage`              | Editable CMS page content                              |
 | `EmailLog`             | Outbound email audit log                               |
 | `WebhookLog`           | Stripe webhook delivery log                            |
-| `Programme`            | Legacy alias retained for migration compatibility     |
+| `AuditLog`             | Append-only change log auto-populated by SaveChangesAsync |
+| `Programme`            | Legacy alias retained for migration compatibility      |
 | `ProgrammePhoto`       | Legacy gallery grouping                                |
 | `ProgrammeRegistration`| Legacy registration alias                              |
 | `BaseEntity`           | Abstract base with `Id`, `CreatedAt`, `UpdatedAt`      |
@@ -161,9 +171,13 @@ Concrete implementations of the interfaces declared in `Application.Interfaces`.
 ```
 src/Infrastructure/
 ├── Persistence/
-│   ├── GiveAIDDbContext.cs        # EF Core 8 DbContext, fluent API config
+│   ├── GiveAIDDbContext.cs        # EF Core 8 DbContext + SaveChangesAsync intercept
+│   │                              #   (soft delete + audit log capture — see §6.1)
 │   ├── Configurations/            # IEntityTypeConfiguration<T> per entity
+│   │                              #   incl. AuditLogConfiguration for the audit_logs table
+│   ├── Entities/                  # (reserved — query-side entity re-exports)
 │   ├── Migrations/                # EF Core generated migrations
+│   │                              #   incl. …_AddAuditLogTable for v2.0.0
 │   └── Seed/                      # DatabaseSeeder, RoleSeeder
 ├── Security/
 │   ├── JwtTokenService.cs         # Issues/validates JWTs
@@ -184,6 +198,86 @@ src/Infrastructure/
 - **Logging** — `ILogger<T>` injected everywhere; structured logging with named placeholders
 - **Configuration** — `IOptions<T>` pattern for `JwtSettings`, `SmtpSettings`, `StripeSettings`
 - **Resilience** — `HttpClient` typed clients with retry policies (where applicable)
+- **Data protection** — `SaveChangesAsync` interception for **soft delete** + **audit log**
+  capture (see §6.1 below). All write paths benefit automatically.
+
+### 6.1. Data Protection Patterns
+
+Two complementary, automatic mechanisms protect data in v2.0.0 — neither requires
+any extra call from application code, both are wired in the `SaveChangesAsync`
+override on `GiveAIDDbContext`:
+
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│                  GiveAIDDbContext.SaveChangesAsync                        │
+│                                                                          │
+│   ChangeTracker.Entries()  ─┐                                            │
+│                              │                                            │
+│   ┌──────────────┬──────────┼────────────────────────────┐               │
+│   │  Added       │ Modified │  Deleted                    │               │
+│   └──────┬───────┴────┬─────┴─────────────┬──────────────┘               │
+│          │            │                   │                               │
+│          ▼            ▼                   ▼                               │
+│   Set CreatedAt,   Set UpdatedAt,    Flip to Modified:                   │
+│   CreatedBy        UpdatedBy         IsDeleted=true                       │
+│          │            │              DeletedAt=UTC                        │
+│          │            │                   │                              │
+│          └────────────┴─────────┬─────────┘                              │
+│                                │                                        │
+│                                ▼                                        │
+│                    Build AuditLog entry (Create|Update|Delete)           │
+│                    OldValues/NewValues = JSON (skip audit fields)         │
+│                                │                                        │
+│                                ▼                                        │
+│              base.SaveChangesAsync()  ──►  DB  +  audit_logs table        │
+└──────────────────────────────────────────────────────────────────────────┘
+```
+
+#### Soft Delete Pattern
+
+| Aspect            | Detail                                                                 |
+|-------------------|------------------------------------------------------------------------|
+| Base fields       | `BaseEntity.IsDeleted : bool` (default false), `BaseEntity.DeletedAt : DateTime?` (null while active) |
+| Global filter     | `OnModelCreating` attaches `WHERE IsDeleted = false` to every entity inheriting from `BaseEntity` (expression-built per entity CLR type) |
+| Interception      | When application code calls `Remove(entity)` → `EntityState.Deleted`, the override flips `EntityState` to `Modified` and sets `IsDeleted = true`, `DeletedAt = DateTime.UtcNow`, `UpdatedAt = DateTime.UtcNow` |
+| Querying deleted  | LINQ: `_context.Campaigns.IgnoreQueryFilters()` to bypass the global filter and see soft-deleted rows (e.g. for admin "Trash" views) |
+| Restore (future)  | Set `IsDeleted = false`, `DeletedAt = null`, save — the row reappears from filter rules on next read; an `Update` audit entry is captured |
+
+**Benefits**
+
+- **Data recovery** — accidental deletes are reversible.
+- **Compliance** — records remain in the database for audit / legal hold even after "deletion".
+- **Audit trail** — every deletion is logged in `audit_logs` with `action='Delete'` and the
+  pre-delete JSON snapshot in `old_values` (see Audit Log MVP below).
+- **Referential integrity** — no orphan FK rows: child entities keep their parent intact.
+
+> **Caveat:** foreign-key cascades are configured as `Restrict` for soft-deletable
+> parents. Application code that needs to "hard-delete" must opt out explicitly
+> (e.g. via raw SQL) and document the rationale in the migration script.
+
+#### Audit Log MVP
+
+| Aspect         | Detail                                                                 |
+|----------------|------------------------------------------------------------------------|
+| Entity         | `Domain/Entities/AuditLog.cs` → `audit_logs` table (see [DATABASE.md §2.9](DATABASE.md#29-audit_logs)) |
+| Configuration  | `Infrastructure/Persistence/Configurations/AuditLogConfiguration.cs` (snake_case column mapping + 3 indexes) |
+| Tracking scope | Every `Added`/`Modified`/`Deleted` entry on a `BaseEntity` is logged |
+| Interception   | `SaveChangesAsync` builds an `AuditLog` per tracked change **before** calling `base.SaveChangesAsync` and adds them to the same transaction so they commit atomically |
+| Snapshotting   | `PropertyValues` serialised to JSON via `System.Text.Json`. Audit fields (`CreatedAt`, `UpdatedAt`, `CreatedBy`, `UpdatedBy`, `IsDeleted`, `DeletedAt`) are excluded from both `OldValues` and `NewValues` |
+| Identity       | `UserId` comes from `ICurrentUserService.GetUserId()` (null for system / seed actions). `IpAddress` / `UserAgent` are reserved for a future middleware hook (currently null) |
+| Performance    | Indexed by `user_id`, `timestamp`, and `(entity_type, entity_id)` — see [DATABASE.md §2.9](DATABASE.md#29-audit_logs) for example queries |
+
+**Benefits**
+
+- **Compliance** — prove who changed what, when, for regulators and donors.
+- **Change tracking** — full before/after JSON snapshots for every Create/Update/Delete.
+- **Forensics** — investigate suspicious activity, reconstruct history, recover deleted rows.
+- **Zero overhead for read paths** — only the write path is intercepted.
+
+> **No manual insert needed.** Application code never writes to `audit_logs`
+> directly — it's an append-only sidecar maintained by the infrastructure layer.
+> Disabling the behaviour would require removing the `SaveChangesAsync` override
+> and would be considered an architectural regression.
 
 ## 7. WebApi Layer (`src/WebApi/`)
 
@@ -329,7 +423,8 @@ SQL Server 2019+ (Express OK). Schema managed through **EF Core migrations** und
 Key tables: `Users`, `Causes`, `Campaigns`, `CampaignRegistrations`, `CampaignReports`,
 `Donations`, `Galleries`, `TeamMembers`, `Achievements`, `Careers`, `CareerApplications`,
 `Organizations`, `Faqs`, `ContactMessages`, `Conversations`, `ConversationMessages`,
-`Invitations`, `CmsPages`, `EmailLogs`, `WebhookLogs`.
+`Invitations`, `CmsPages`, `EmailLogs`, `WebhookLogs`, `audit_logs` (append-only,
+auto-populated by SaveChangesAsync — see [§6.1](#61-data-protection-patterns)).
 
 ## 11. Cross-cutting Concerns
 

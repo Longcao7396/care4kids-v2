@@ -1,5 +1,6 @@
 using GiveAID.Application.Common.Interfaces;
 using GiveAID.Application.Features.Causes.Commands;
+using GiveAID.Application.Services;
 
 namespace GiveAID.Application.Features.Causes.Commands;
 
@@ -9,10 +10,12 @@ namespace GiveAID.Application.Features.Causes.Commands;
 public class CreateCauseCommandHandler : IRequestHandler<CreateCauseCommand, int>
 {
     private readonly IApplicationDbContext _context;
+    private readonly ICacheService _cacheService;
 
-    public CreateCauseCommandHandler(IApplicationDbContext context)
+    public CreateCauseCommandHandler(IApplicationDbContext context, ICacheService cacheService)
     {
         _context = context;
+        _cacheService = cacheService;
     }
 
     public async Task<int> Handle(CreateCauseCommand request, CancellationToken cancellationToken)
@@ -31,6 +34,8 @@ public class CreateCauseCommandHandler : IRequestHandler<CreateCauseCommand, int
 
         _context.Causes.Add(cause);
         await _context.SaveChangesAsync(cancellationToken);
+
+        _cacheService.InvalidateStatistics();
 
         return cause.CauseId;
     }

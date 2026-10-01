@@ -92,16 +92,11 @@ function LoginPage() {
                 {/* Logo + title */}
                 <div className="auth-header text-center">
                   <div className="auth-logo-wrap mb-3">
-                    <div className="auth-logo-icon">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-                      </svg>
-                    </div>
-                    <div className="auth-logo-text">
-                      <span className="auth-logo-brand">Care</span>
-                      <span className="auth-logo-accent">4</span>
-                      <span className="auth-logo-brand">Kids</span>
-                    </div>
+                    <img 
+                      src="/images/branding/Care4Kids_logo_clean.svg" 
+                      alt="Care4Kids" 
+                      className="auth-logo-image"
+                    />
                   </div>
                   <h1 className="auth-title">Welcome back</h1>
                   <p className="auth-subtitle">Sign in to continue supporting children's welfare</p>
@@ -140,7 +135,7 @@ function LoginPage() {
                         id="login-username"
                         type="text"
                         name="username"
-                        placeholder="e.g. admin"
+                        placeholder="Enter your username"
                         value={form.username}
                         onChange={handleChange}
                         className="auth-input"
@@ -151,9 +146,6 @@ function LoginPage() {
                         required
                       />
                     </div>
-                    <Form.Text className="text-muted small mt-1">
-                      Sign in with your account username.
-                    </Form.Text>
                   </Form.Group>
 
                   <Form.Group className="auth-form-group">
@@ -231,7 +223,7 @@ function LoginPage() {
                 {/* Footer link */}
                 <div className="auth-footer-link text-center">
                   <span className="auth-footer-text">Don't have an account? </span>
-                  <Link to="/register" className="auth-footer-link-action">Create one free</Link>
+                  <Link to="/register" className="auth-footer-link-action">Sign up</Link>
                 </div>
 
                 {/* Trust footer — humanitarian microcopy */}

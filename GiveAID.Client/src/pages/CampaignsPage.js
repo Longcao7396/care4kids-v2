@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Container, Row, Col, Card, Badge, Form, Button, InputGroup } from 'react-bootstrap';
 import api from '../services/api';
-import { SAMPLE_CAMPAIGNS, SAMPLE_CAUSES } from '../data/sampleCampaigns';
 import './CampaignsPage.css';
 
 function CampaignsPage() {
@@ -16,21 +15,28 @@ function CampaignsPage() {
   const [searchInput, setSearchInput] = useState('');
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
+  // Page size 12 = 4 rows x 3 cols on desktop grid. Matches backend default.
   const pageSize = 12;
+  // Featured campaign for the hero pull-out is fetched separately (via
+  // /campaigns/featured) so it does not steal an item from the grid below.
+  // Without this, filtering the featured campaign out of the paged list would
+  // leave 11 cards on a 12-slot grid and the last row would have only 2.
+  const [featuredCampaign, setFeaturedCampaign] = useState(null);
 
   const fetchCauses = useCallback(async () => {
     try {
+      // api.js unwraps the envelope; response is the plain array of CauseDto
       const response = await api.get('/causes');
-      if (response.data.success && response.data.data && response.data.data.length > 0) {
-        setCauses(response.data.data);
+      if (Array.isArray(response)) {
+        setCauses(response);
       } else {
-        // Fallback to sample causes when API returns empty
-        setCauses(SAMPLE_CAUSES);
+        setCauses([]);
       }
     } catch (err) {
-      console.error('Error fetching causes:', err);
-      // Use sample causes as fallback
-      setCauses(SAMPLE_CAUSES);
+      console.error('Error fetching causes:', err.message, err._raw);
+      // If causes fail to load, just set empty array — the filter dropdown
+      // will show "All Categories" only, which is acceptable degradation.
+      setCauses([]);
     }
   }, []);
 
@@ -43,31 +49,25 @@ function CampaignsPage() {
       if (selectedCause) params.causeId = selectedCause;
       if (searchTerm.trim()) params.search = searchTerm.trim();
 
+      // api.js unwraps the { success, message, data } envelope.
+      // Response is the paginated payload: { items, totalCount, page, pageSize }
       const response = await api.get('/campaigns', { params });
 
-      if (response.data.success) {
-        // API returns { items: [...], page, pageSize, totalCount }
-        const result = response.data.data;
-        const items = result?.items || [];
-        // If API returns empty array on page 1, fall back to sample data.
-        // Pages beyond 1 with no items just means we've reached the end.
-        if (items.length === 0 && page === 1) {
-          setCampaigns(SAMPLE_CAMPAIGNS);
-          setTotalCount(SAMPLE_CAMPAIGNS.length);
-        } else {
-          setCampaigns(items);
-          setTotalCount(result?.totalCount ?? items.length);
-        }
+      if (response && Array.isArray(response.items)) {
+        setCampaigns(response.items);
+        setTotalCount(response.totalCount || 0);
       } else {
-        // Use sample campaigns silently so users always see something
-        setCampaigns(SAMPLE_CAMPAIGNS);
-        setTotalCount(SAMPLE_CAMPAIGNS.length);
+        // Response structure unexpected; treat as empty
+        setCampaigns([]);
+        setTotalCount(0);
       }
     } catch (err) {
-      // Network / server error → still show demo data instead of empty page
-      console.error('Campaigns fetch failed, using sample data:', err);
-      setCampaigns(SAMPLE_CAMPAIGNS);
-      setTotalCount(SAMPLE_CAMPAIGNS.length);
+      console.error('Failed to fetch campaigns:', err.message, err._raw);
+      // On error, show a visible error state with a Retry button.
+      // Do NOT silently fall back to SAMPLE_CAMPAIGNS.
+      setError(err.message || 'Unable to load campaigns. Please try again.');
+      setCampaigns([]);
+      setTotalCount(0);
     } finally {
       setLoading(false);
     }
@@ -85,6 +85,24 @@ function CampaignsPage() {
   useEffect(() => {
     fetchCampaigns();
   }, [fetchCampaigns]);
+
+  // Featured campaign for the hero pull-out is fetched separately from the
+  // grid so it does not steal a slot from the paged list below. We only
+  // refetch when filters change (not when the user clicks Next/Prev).
+  const fetchFeatured = useCallback(async () => {
+    try {
+      const res = await api.get('/campaigns/featured', { params: { count: 1 } });
+      const first = Array.isArray(res) ? res[0] : (res?.items?.[0] ?? null);
+      setFeaturedCampaign(first || null);
+    } catch (err) {
+      console.warn('Using no featured campaign:', err.message);
+      setFeaturedCampaign(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchFeatured();
+  }, [fetchFeatured, selectedCause, selectedStatus, searchTerm]);
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('vi-VN', {
@@ -107,8 +125,10 @@ function CampaignsPage() {
     setSearchInput('');
   };
 
-  const featuredCampaign = campaigns.find(c => c.isFeatured) || campaigns[0];
-  const gridCampaigns = campaigns.filter(c => c !== featuredCampaign);
+  // The grid now renders ALL paged items. The featured campaign is shown
+  // above the grid (if /campaigns/featured returned one), and lives in its
+  // own state — it never comes out of the page slice. This guarantees a
+  // full 12-card page on every page that has 12 items to show.
 
   // Impact stats
   const totalDonors = campaigns.reduce((sum, c) => sum + (c.donorCount || 0), 0);
@@ -291,7 +311,7 @@ function CampaignsPage() {
                     />
                     <div className="cp-featured-badge-overlay">
                       <Badge className="cp-cause-badge">
-                        {featuredCampaign.cause?.causeName || 'Child Welfare'}
+                        {featuredCampaign.causeName || 'Child Welfare'}
                       </Badge>
                   </div>
                   </div>
@@ -412,7 +432,7 @@ function CampaignsPage() {
             </div>
           )}
 
-          {!error && gridCampaigns.length === 0 && (
+          {!error && campaigns.length === 0 && (
             <div className="cp-empty">
               <div className="cp-empty-icon-wrap">
                 <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
@@ -428,9 +448,9 @@ function CampaignsPage() {
             </div>
           )}
 
-          {!error && gridCampaigns.length > 0 && (
+          {!error && campaigns.length > 0 && (
             <Row className="cp-campaign-grid">
-              {gridCampaigns.map((campaign) => (
+              {campaigns.map((campaign) => (
                 <Col key={campaign.campaignId} lg={4} md={6} className="mb-4">
                   <Card className="cp-campaign-card">
                     {/* Image */}
@@ -446,7 +466,7 @@ function CampaignsPage() {
                         <Badge className="cp-featured-tag">Featured</Badge>
                       )}
                       <Badge className="cp-cause-tag">
-                        {campaign.cause?.causeName || 'Child Welfare'}
+                        {campaign.causeName || 'Child Welfare'}
                       </Badge>
                     </div>
 

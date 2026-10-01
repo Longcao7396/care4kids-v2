@@ -52,14 +52,10 @@ function CareerApplyModal({ show, career, onHide, onSuccess }) {
     try {
       setSubmitting(true);
       setError(null);
-      const response = await api.post(`/careers/${career.careerId}/apply`, form);
-      if (response.data.success) {
-        onSuccess && onSuccess(response.data);
-      } else {
-        setError(response.data.message || 'Failed to submit application.');
-      }
+      await api.post(`/careers/${career.careerId}/apply`, form);
+      onSuccess && onSuccess();
     } catch (err) {
-      setError(err.response?.data?.Message || err.response?.data?.message || 'Failed to submit application.');
+      setError(err.response?.data?.Message || err.response?.data?.message || err.message || 'Failed to submit application.');
     } finally {
       setSubmitting(false);
     }
@@ -241,9 +237,7 @@ function CareerPage() {
     try {
       setLoading(true);
       const response = await api.get('/careers', { params: { activeOnly: true } });
-      if (response.data.success) {
-        setJobs(response.data.data || []);
-      }
+      setJobs(Array.isArray(response) ? response : (response?.items || []));
     } catch (err) {
       setError('Failed to load open positions.');
     } finally {

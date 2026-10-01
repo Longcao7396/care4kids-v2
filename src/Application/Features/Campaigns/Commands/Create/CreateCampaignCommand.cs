@@ -27,5 +27,5 @@ public class CreateCampaignCommand : IRequest<CampaignDto>
     public string Status { get; set; } = "Active";
     public bool IsFeatured { get; set; }
     public int DisplayOrder { get; set; }
-    public int? CreatedBy { get; set; }
+    public string? CreatedBy { get; set; }
 }

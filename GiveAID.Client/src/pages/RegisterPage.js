@@ -109,16 +109,11 @@ function RegisterPage() {
                 {/* Header */}
                 <div className="auth-header text-center">
                   <div className="auth-logo-wrap mb-3">
-                    <div className="auth-logo-icon">
-                      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-                      </svg>
-                    </div>
-                    <div className="auth-logo-text">
-                      <span className="auth-logo-brand">Care</span>
-                      <span className="auth-logo-accent">4</span>
-                      <span className="auth-logo-brand">Kids</span>
-                    </div>
+                    <img 
+                      src="/images/branding/Care4Kids_logo_clean.svg" 
+                      alt="Care4Kids" 
+                      className="auth-logo-image"
+                    />
                   </div>
                   <h1 className="auth-title">Create your account</h1>
                   <p className="auth-subtitle">Join Care4Kids and help make a difference in children's lives</p>
@@ -434,12 +429,7 @@ function RegisterPage() {
                         <span>Creating account…</span>
                       </>
                     ) : (
-                      <>
-                        <span>Create Account</span>
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-                          <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
-                        </svg>
-                      </>
+                      <span>Create Account</span>
                     )}
                   </Button>
                 </Form>

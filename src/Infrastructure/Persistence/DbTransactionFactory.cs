@@ -1,12 +1,37 @@
-using System.Data.Common;
 using GiveAID.Application.Common.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace GiveAID.Infrastructure.Persistence;
 
 /// <summary>
-/// Creates database transactions from the EF Core DbContext's connection.
-/// Used to ensure atomicity for operations that mix EF Core SaveChanges with raw SQL (C-04).
+/// Wraps EF Core's <see cref="IDbContextTransaction"/> as an
+/// <see cref="IAppTransactionScope"/> so callers in the Application layer can
+/// control transaction commit/rollback without referencing EF types.
+/// </summary>
+internal sealed class EfAppTransactionScope : IAppTransactionScope
+{
+    private readonly IDbContextTransaction _transaction;
+
+    public EfAppTransactionScope(IDbContextTransaction transaction)
+    {
+        _transaction = transaction;
+    }
+
+    public Task CommitAsync(CancellationToken cancellationToken = default)
+        => _transaction.CommitAsync(cancellationToken);
+
+    public Task RollbackAsync(CancellationToken cancellationToken = default)
+        => _transaction.RollbackAsync(cancellationToken);
+
+    public ValueTask DisposeAsync() => _transaction.DisposeAsync();
+}
+
+/// <summary>
+/// Creates EF Core transactions on the scoped DbContext.
+/// All <c>SaveChangesAsync</c> calls and raw SQL UPDATEs issued through the same
+/// DbContext (including those issued by <see cref="AtomicCampaignUpdater"/>) are
+/// enlisted in the returned <see cref="IAppTransactionScope"/> automatically.
 /// </summary>
 public class DbTransactionFactory : IDbTransactionFactory
 {
@@ -17,22 +42,14 @@ public class DbTransactionFactory : IDbTransactionFactory
         _context = context;
     }
 
-    /// <inheritdoc/>
-    /// Opens the DbContext's underlying connection and starts a transaction.
-    /// The caller receives both the connection and transaction, and is responsible for disposing them.
-    /// </summary>
-    public async Task<(DbConnection Connection, DbTransaction Transaction)> BeginTransactionAsync(
+    public async Task<IAppTransactionScope> BeginTransactionAsync(
         CancellationToken cancellationToken = default)
     {
-        // Open connection if not already open
-        if (_context.Database.GetDbConnection().State != System.Data.ConnectionState.Open)
-        {
-            await _context.Database.OpenConnectionAsync(cancellationToken);
-        }
-
-        var connection = _context.Database.GetDbConnection();
-        var transaction = connection.BeginTransaction();
-
-        return (connection, transaction);
+        // BeginTransactionAsync on the DbContext opens the underlying connection if
+        // necessary and starts a transaction; the returned IDbContextTransaction is
+        // automatically tracked by EF Core, so subsequent SaveChangesAsync + raw SQL
+        // on the same DbContext enlist in this transaction.
+        var efTransaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+        return new EfAppTransactionScope(efTransaction);
     }
 }

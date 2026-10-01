@@ -21,7 +21,7 @@ const fmtDate = (iso) => {
 
 function AdminInvitationsPage() {
   const { user } = useAuth();
-  const canAccess = user?.role === 'Admin' || user?.role === 'SuperAdmin';
+  const canAccess = user?.role === 'Admin';
 
   const [items, setItems] = useState([]);
   const [pagination, setPagination] = useState({ page: 1, pageSize: 30, total: 0, totalPages: 1 });
@@ -37,17 +37,16 @@ function AdminInvitationsPage() {
       const params = { page, pageSize: 30 };
       if (statusFilter) params.status = statusFilter;
       const res = await api.get('/invitations', { params });
-      if (res.data.success) {
-        const d = res.data.data;
-        setItems(d.items || []);
-        const p = d.pagination || {};
-        setPagination({
-          page: p.page ?? page,
-          pageSize: p.pageSize ?? 30,
-          total: p.total ?? 0,
-          totalPages: p.totalPages ?? 1,
-        });
-      }
+      // res is { items, page, pageSize, totalCount }
+      setItems(res.items || []);
+      const total = res.totalCount ?? res.total ?? 0;
+      const pageSize = res.pageSize ?? 30;
+      setPagination({
+        page: res.page ?? page,
+        pageSize,
+        total,
+        totalPages: Math.max(Math.ceil(total / pageSize), 1),
+      });
     } catch (err) {
       console.error(err);
       setErrorMsg(err.response?.data?.message || 'Failed to load invitations.');

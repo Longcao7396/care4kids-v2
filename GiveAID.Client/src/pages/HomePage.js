@@ -6,15 +6,23 @@ import './HomePage.css';
 
 const HomePage = () => {
   const [featuredCampaigns, setFeaturedCampaigns] = useState([]);
+  const [galleryPreview, setGalleryPreview] = useState([]);
   const [loading, setLoading] = useState(true);
 
 useEffect(() => {
   let cancelled = false;
   const loadData = async () => {
     try {
-      const campaignsRes = await api.get('/campaigns/featured', { params: { count: 3 } });
-      if (!cancelled && campaignsRes.data.success) {
-        setFeaturedCampaigns(campaignsRes.data.data || []);
+      const [campaignsRes, featuredGalleryRes] = await Promise.all([
+        api.get('/campaigns/featured', { params: { count: 3 } }),
+        api.get('/gallery/featured', { params: { count: 8 } }).catch(() => []),
+      ]);
+      if (!cancelled) {
+        setFeaturedCampaigns(Array.isArray(campaignsRes) ? campaignsRes : (campaignsRes?.items || []));
+        const galleryArr = Array.isArray(featuredGalleryRes)
+          ? featuredGalleryRes
+          : (featuredGalleryRes?.items || featuredGalleryRes?.data || []);
+        setGalleryPreview(galleryArr.slice(0, 8));
       }
     } catch (error) {
       if (!cancelled) console.error('Error loading data:', error);
@@ -485,6 +493,64 @@ useEffect(() => {
           </div>
         </Container>
       </section>
+
+      {/* ============================================================
+          6. GALLERY PREVIEW — Featured photos linking to /gallery
+      ============================================================ */}
+      {galleryPreview.length > 0 && (
+        <section className="c4k-gallery-preview">
+          <Container>
+            <div className="c4k-section-header">
+              <p className="eyebrow">From the Field</p>
+              <h2 className="c4k-section-title">Moments That Matter</h2>
+              <p className="c4k-section-desc">
+                Real stories captured with consent across Vietnam — every photograph
+                celebrates the resilience of children and communities we serve.
+              </p>
+            </div>
+
+            <div className="c4k-gallery-grid">
+              {galleryPreview.map((item) => {
+                const url = item.photoUrl || item.url || '';
+                const thumb = item.thumbnail || item.thumbnailUrl || url;
+                const title = item.title || 'Untitled';
+                return (
+                  <Link
+                    key={item.galleryId ?? item.id ?? url}
+                    to="/gallery"
+                    className="c4k-gallery-card"
+                    aria-label={`View ${title}`}
+                  >
+                    <div className="c4k-gallery-img-wrap">
+                      <img
+                        src={thumb}
+                        alt={title}
+                        loading="lazy"
+                        onError={(e) => { e.currentTarget.src = url; }}
+                      />
+                      <div className="c4k-gallery-img-overlay">
+                        <span className="c4k-gallery-img-title">{title}</span>
+                      </div>
+                      {item.category && (
+                        <span className="c4k-gallery-cat-badge">{item.category}</span>
+                      )}
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+
+            <div className="c4k-section-footer">
+              <Link to="/gallery" className="c4k-btn-ghost-outline">
+                <span>View Full Gallery</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+                </svg>
+              </Link>
+            </div>
+          </Container>
+        </section>
+      )}
 
       {/* ============================================================
           7. FINAL CTA — Coral accent section

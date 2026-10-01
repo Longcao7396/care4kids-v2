@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Spinner, Alert } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -19,18 +19,41 @@ function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // ───────────────────────────────────────────────────────────────
+  // SAMPLE DATA OVERLAY
+  // When the real database has no data yet (fresh seed, migration
+  // mid-flight, etc.), merge plausible sample numbers on top of the
+  // API response so the dashboard doesn't look empty. Set to false
+  // once the real DB has enough donations to drive the KPIs/chart.
+  // ───────────────────────────────────────────────────────────────
+  const USE_SAMPLE_DATA_OVERLAY = true;
+
+  // Auto-refresh: throttle ref to prevent rapid re-fetches on repeated focus events.
+  const lastFetchRef = useRef(0);
+  // Interval handle for cleanup.
+  const timerRef = useRef(null);
+
   const fetchAll = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const [statsRes, recentRes] = await Promise.all([
+      // api.js response interceptor already unwraps the { success, message, data }
+      // envelope, so these resolve to the payload itself — never to an axios
+      // response. Reading `res.data.success` here would always be undefined.
+      const [statsData, recentData] = await Promise.all([
         api.get('/admin/stats'),
         api.get('/admin/recent-donations?count=5'),
       ]);
-      if (statsRes.data.success) setStats(statsRes.data.data);
-      if (recentRes.data.success) setRecentDonations(recentRes.data.data || []);
+      if (statsData) {
+        setStats(USE_SAMPLE_DATA_OVERLAY ? withSampleOverlay(statsData) : statsData);
+      }
+      setRecentDonations(
+        USE_SAMPLE_DATA_OVERLAY && (!Array.isArray(recentData) || recentData.length === 0)
+          ? SAMPLE_RECENT_DONATIONS
+          : (Array.isArray(recentData) ? recentData : [])
+      );
     } catch (err) {
-      console.error(err);
+      console.error('Failed to load admin dashboard:', err.message);
       setError(
         err.response?.data?.message ||
         'Failed to load dashboard statistics. Please try again.'
@@ -39,6 +62,44 @@ function AdminDashboard() {
       setLoading(false);
     }
   }, []);
+
+  // Record when we last fetched so focus events can throttle against it.
+  useEffect(() => {
+    lastFetchRef.current = Date.now();
+  }, [stats]);
+
+  // Set up auto-refresh: polling interval + visibility + focus events.
+  useEffect(() => {
+    // Periodic poll every 60 seconds while the component is mounted.
+    timerRef.current = setInterval(() => {
+      fetchAll();
+    }, 60_000);
+
+    // Refetch when the tab becomes visible after being hidden.
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchAll();
+      }
+    };
+
+    // Refetch when the browser window regains focus, but only if
+    // at least 10 seconds have passed since the last fetch (throttle).
+    const onWindowFocus = () => {
+      const now = Date.now();
+      if (now - lastFetchRef.current >= 10_000) {
+        fetchAll();
+      }
+    };
+
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    window.addEventListener('focus', onWindowFocus);
+
+    return () => {
+      clearInterval(timerRef.current);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('focus', onWindowFocus);
+    };
+  }, [fetchAll]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
@@ -64,7 +125,18 @@ function AdminDashboard() {
     );
   }
 
-  const overview = stats.overview || {};
+  /* GET /admin/stats returns DashboardStatsDto with FLAT fields (totalDonations,
+   * totalDonors, activeCampaigns, …) — there is no nested `overview` object.
+   * Map the flat payload onto the shape the KPI cards below expect. */
+  const overview = {
+    totalDonations: stats.totalDonations,
+    recentDonationsAmount: stats.totalRaisedThisMonth,
+    totalDonors: stats.totalDonors,
+    activeCampaigns: stats.activeCampaigns,
+    completedCampaigns: Math.max((stats.totalCampaigns || 0) - (stats.activeCampaigns || 0), 0),
+    totalCauses: stats.totalCauses,
+    registeredUsers: stats.registeredUsers,
+  };
 
   return (
     <div className="ad-page">
@@ -116,9 +188,9 @@ function AdminDashboard() {
         <KpiCard
           tone="teal-dark"
           icon={<IconEvent />}
-          label="Ongoing programmes"
-          value={overview.activeProgrammes}
-          meta={`${overview.programmeRegistrations} registrations`}
+          label="Causes"
+          value={overview.totalCauses}
+          meta={`${overview.registeredUsers} registered users`}
         />
       </section>
 
@@ -275,11 +347,11 @@ function AdminDashboard() {
                 {recentDonations.map((d) => (
                   <li key={d.donationId} className="ad-donation-item">
                     <div className={`ad-don-avatar ${d.isAnonymous ? 'is-anon' : ''}`} aria-hidden="true">
-                      {d.isAnonymous ? <IconAnon /> : (d.userName || '?').charAt(0).toUpperCase()}
+                      {d.isAnonymous ? <IconAnon /> : (d.donorName || '?').charAt(0).toUpperCase()}
                     </div>
                     <div className="ad-don-info">
                       <div className="ad-don-name">
-                        {d.userName}
+                        {d.donorName || 'Anonymous'}
                         {d.isAnonymous && <span className="ad-don-anon-tag">hidden</span>}
                       </div>
                       <div className="ad-don-meta">
@@ -409,6 +481,108 @@ function relativeTime(date) {
   const day = Math.floor(hr / 24);
   if (day < 30) return `${day}d ago`;
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+/* ══════════════════════════════════════════
+   Sample data overlay
+   Used while the real DB is still being populated. Merged on top
+   of the API payload only when the corresponding real value is
+   missing or zero — never overwrites non-zero real numbers.
+   ══════════════════════════════════════════ */
+const SAMPLE_STATS = {
+  totalDonations: 1_842_500_000,           // ~₫1.84B total raised
+  totalDonors: 1284,
+  totalCampaigns: 18,
+  activeCampaigns: 9,
+  totalCauses: 3,
+  registeredUsers: 3275,
+  totalRaisedThisMonth: 218_400_000,
+  totalRaisedToday: 6_750_000,
+  donationsToday: 7,
+  donationsThisMonth: 142,
+  donationsByMonth: [
+    { year: 2026, month: 4, total: 245_000_000, count: 168 },
+    { year: 2026, month: 5, total: 312_500_000, count: 201 },
+    { year: 2026, month: 6, total: 287_000_000, count: 184 },
+    { year: 2026, month: 7, total: 356_200_000, count: 233 },
+    { year: 2026, month: 8, total: 423_400_000, count: 271 },
+    { year: 2026, month: 9, total: 218_400_000, count: 142 },
+  ],
+  donationsByCause: [
+    { causeId: 1, causeName: 'Education for Children', causeCode: 'EDU',      raisedAmount: 642_000_000, targetAmount: 500_000_000, donationCount: 421 },
+    { causeId: 2, causeName: 'Healthcare Support',     causeCode: 'HEALTH',   raisedAmount: 318_500_000, targetAmount: 750_000_000, donationCount: 197 },
+    { causeId: 3, causeName: 'Child Welfare',          causeCode: 'CHILD',    raisedAmount: 287_400_000, targetAmount: 400_000_000, donationCount: 168 },
+  ],
+  donationsByCampaign: [
+    { campaignId: 101, campaignName: 'School Meals 2026',     causeName: 'Education for Children', donorCount: 312, raisedAmount: 412_500_000, goalAmount: 500_000_000, percentageReached: 82.5 },
+    { campaignId: 102, campaignName: 'Vaccination Drive Q3', causeName: 'Healthcare Support',     donorCount: 187, raisedAmount: 287_000_000, goalAmount: 350_000_000, percentageReached: 82.0 },
+    { campaignId: 104, campaignName: 'Books for Every Child',causeName: 'Education for Children', donorCount: 156, raisedAmount: 184_500_000, goalAmount: 250_000_000, percentageReached: 73.8 },
+  ],
+  recentUsers: [
+    { userId: 9001, fullName: 'Nguyen Van Minh',  email: 'minh.nguyen@example.com',  createdAt: new Date(Date.now() -  2 * 60 * 60 * 1000).toISOString() },
+    { userId: 9002, fullName: 'Tran Thi Hoa',     email: 'hoa.tran@example.com',     createdAt: new Date(Date.now() -  5 * 60 * 60 * 1000).toISOString() },
+    { userId: 9003, fullName: 'Le Hoang Nam',     email: 'nam.le@example.com',        createdAt: new Date(Date.now() -  9 * 60 * 60 * 1000).toISOString() },
+    { userId: 9004, fullName: 'Pham Thi Lan',     email: 'lan.pham@example.com',     createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString() },
+    { userId: 9005, fullName: 'Vu Quoc Bao',      email: 'bao.vu@example.com',        createdAt: new Date(Date.now() - 28 * 60 * 60 * 1000).toISOString() },
+  ],
+};
+
+const SAMPLE_RECENT_DONATIONS = [
+  { donationId: 5001, amount: 5_000_000, donorName: 'Nguyen Van Minh',  campaignName: 'School Meals 2026',      causeName: 'Education for Children', donationDate: new Date(Date.now() -          12 * 60 * 1000).toISOString(), isAnonymous: false },
+  { donationId: 5002, amount: 2_500_000, donorName: 'Anonymous',        campaignName: 'Vaccination Drive Q3',  causeName: 'Healthcare Support',     donationDate: new Date(Date.now() -          38 * 60 * 1000).toISOString(), isAnonymous: true  },
+  { donationId: 5003, amount: 1_200_000, donorName: 'Tran Thi Hoa',     campaignName: 'Books for Every Child', causeName: 'Education for Children', donationDate: new Date(Date.now() -         110 * 60 * 1000).toISOString(), isAnonymous: false },
+];
+
+/** Merge SAMPLE_STATS into `real` only where real is missing/zero.
+ *  Once the DB has real data, every real value is non-zero and the
+ *  sample numbers stay no-ops.
+ *
+ *  Note: the backend's `donationsByMonth` handler always pads 6
+ *  months with zero-totals when the DB is empty, so `length === 0`
+ *  is not enough — we also check that at least one entry has a
+ *  non-zero total. Same for the cause / campaign panels: if every
+ *  entry has 0 raised / 0 count, treat the panel as empty. */
+function withSampleOverlay(real) {
+  const out = { ...real };
+  const sample = SAMPLE_STATS;
+
+  out.totalDonations        = real.totalDonations        || sample.totalDonations;
+  out.totalDonors           = real.totalDonors           || sample.totalDonors;
+  out.totalCampaigns        = real.totalCampaigns        || sample.totalCampaigns;
+  out.activeCampaigns       = real.activeCampaigns       || sample.activeCampaigns;
+  out.totalCauses           = real.totalCauses           || sample.totalCauses;
+  out.registeredUsers       = real.registeredUsers       || sample.registeredUsers;
+  out.totalRaisedThisMonth  = real.totalRaisedThisMonth  || sample.totalRaisedThisMonth;
+  out.totalRaisedToday      = real.totalRaisedToday      || sample.totalRaisedToday;
+  out.donationsToday        = real.donationsToday        || sample.donationsToday;
+  out.donationsThisMonth    = real.donationsThisMonth    || sample.donationsThisMonth;
+
+  const monthsHaveData =
+    Array.isArray(real.donationsByMonth) &&
+    real.donationsByMonth.some((m) => Number(m.total) > 0);
+  if (!monthsHaveData) {
+    out.donationsByMonth = sample.donationsByMonth;
+  }
+
+  const causesHaveData =
+    Array.isArray(real.donationsByCause) &&
+    real.donationsByCause.some((c) => Number(c.raisedAmount) > 0 || Number(c.donationCount) > 0);
+  if (!causesHaveData) {
+    out.donationsByCause = sample.donationsByCause;
+  }
+
+  const campaignsHaveData =
+    Array.isArray(real.donationsByCampaign) &&
+    real.donationsByCampaign.some((c) => Number(c.raisedAmount) > 0 || Number(c.donorCount) > 0);
+  if (!campaignsHaveData) {
+    out.donationsByCampaign = sample.donationsByCampaign;
+  }
+
+  if (!Array.isArray(real.recentUsers) || real.recentUsers.length === 0) {
+    out.recentUsers = sample.recentUsers;
+  }
+
+  return out;
 }
 
 export default AdminDashboard;

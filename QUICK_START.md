@@ -128,8 +128,8 @@ Password: Admin@123
 
 ### Test 2: Login với Demo User
 ```
-Email: user@example.com
-Password: User@123
+Username: demo
+Password: Demo@123
 ```
 
 ### Test 3: Tạo User mới
@@ -218,10 +218,10 @@ taskkill /PID <PID> /F
 ## 📊 Default Data Seeded
 
 ### Users
-| Email | Password | Role |
-|-------|----------|------|
-| admin@give-aid.org | Admin@123 | Admin |
-| user@example.com | User@123 | User |
+| Username | Password | Role | Email |
+|----------|----------|------|-------|
+| admin | Admin@123 | Admin | admin@give-aid.org |
+| demo | Demo@123 | User | demo@give-aid.org |
 
 ### Causes (3)
 - Children Welfare (Target: $100,000)
@@ -304,7 +304,7 @@ axios.get('/api/causes', {
    POST {{baseUrl}}/auth/login
    Body (JSON):
    {
-     "email": "admin@give-aid.org",
+     "username": "admin",
      "password": "Admin@123"
    }
    ```

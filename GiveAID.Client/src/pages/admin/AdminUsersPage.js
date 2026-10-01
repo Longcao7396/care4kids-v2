@@ -5,23 +5,40 @@ import { useAuth } from '../../contexts/AuthContext';
 import AdminPageFrame from '../../components/AdminPageFrame';
 import '../admin/AdminForm.css';
 
-/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+/* ----------------------------------------------------------------------
  * AdminUsersPage
  *   Manage all platform users.
- *   - Admins can deactivate/reactivate and change Userâ†’Admin (role guard).
- *   - SuperAdmin can change any role including SuperAdmin demotion/promotion
- *     (with last-SuperAdmin guard left to backend).
- * â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+ *   - Admins can deactivate/reactivate and change User to Admin (role guard).
+ *
+ * NOTE on encoding:
+ *   This file is intentionally pure ASCII. All non-ASCII characters are
+ *   written as JavaScript Unicode escapes (\uXXXX) so the source cannot
+ *   be corrupted by an editor that saves in a non-UTF-8 encoding.
+ *   The visible em-dash, ellipsis, arrow, etc. are emitted at runtime by
+ *   the JavaScript engine, guaranteeing correct end-to-end UTF-8 behaviour.
+ * ---------------------------------------------------------------------- */
 
-const ROLES = ['User', 'Admin', 'SuperAdmin'];
+const ROLES = ['User', 'Admin'];
+
+// Unicode characters used in this page, defined once via \uXXXX escapes.
+//   EM_DASH  = U+2014 EM DASH
+//   ELLIPSIS = U+2026 HORIZONTAL ELLIPSIS
+//   MIDDOT   = U+00B7 MIDDLE DOT
+//   ANGLE_L  = U+2039 SINGLE LEFT-POINTING ANGLE QUOTATION MARK
+//   ANGLE_R  = U+203A SINGLE RIGHT-POINTING ANGLE QUOTATION MARK
+const EM_DASH  = '\u2014';
+const ELLIPSIS = '\u2026';
+const MIDDOT   = '\u00B7';
+const ANGLE_L  = '\u2039';
+const ANGLE_R  = '\u203A';
 
 const fmtDate = (iso) => {
-  if (!iso) return 'â€”';
+  if (!iso) return EM_DASH;
   const d = new Date(iso);
   return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 };
 const fmtDateTime = (iso) => {
-  if (!iso) return 'â€”';
+  if (!iso) return EM_DASH;
   const d = new Date(iso);
   return d.toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 };
@@ -30,7 +47,7 @@ const fmtVnd = (n) => new Intl.NumberFormat('vi-VN', {
 }).format(n || 0);
 
 function AdminUsersPage() {
-  const { user: me, isSuperAdmin } = useAuth();
+  const { user: me, isAdmin } = useAuth();
   const [items, setItems] = useState([]);
   const [pagination, setPagination] = useState({ page: 1, pageSize: 20, total: 0, totalPages: 1 });
   const [loading, setLoading] = useState(true);
@@ -49,16 +66,14 @@ function AdminUsersPage() {
       if (roleFilter) params.role = roleFilter;
       if (search.trim()) params.search = search.trim();
       const res = await api.get('/admin/users', { params });
-      if (res.data.success) {
-        const d = res.data.data;
-        setItems(d.items || []);
-        setPagination({
-          page: d.page,
-          pageSize: d.pageSize,
-          total: d.total,
-          totalPages: d.totalPages || 1,
-        });
-      }
+      // res is { items, page, pageSize, total, totalPages }
+      setItems(res.items || []);
+      setPagination({
+        page: res.page,
+        pageSize: res.pageSize,
+        total: res.total,
+        totalPages: res.totalPages || 1,
+      });
     } catch (err) {
       console.error(err);
       setErrorMsg(err.response?.data?.message || 'Failed to load users.');
@@ -82,11 +97,9 @@ function AdminUsersPage() {
   const handleChangeRole = async (target, newRole) => {
     if (target.role === newRole) return;
     try {
-      const res = await api.put(`/admin/users/${target.userId}/role`, { role: newRole });
-      if (res.data.success) {
-        setItems((arr) => arr.map((u) => (u.userId === target.userId ? { ...u, role: newRole } : u)));
-        flashSuccess(`Role updated to ${newRole}.`);
-      }
+      await api.put(`/admin/users/${target.userId}/role`, { role: newRole });
+      setItems((arr) => arr.map((u) => (u.userId === target.userId ? { ...u, role: newRole } : u)));
+      flashSuccess(`Role updated to ${newRole}.`);
     } catch (err) {
       setErrorMsg(err.response?.data?.message || 'Failed to update role.');
     }
@@ -94,11 +107,9 @@ function AdminUsersPage() {
 
   const handleToggleActive = async (target) => {
     try {
-      const res = await api.put(`/admin/users/${target.userId}/status`, { isActive: !target.isActive });
-      if (res.data.success) {
-        setItems((arr) => arr.map((u) => (u.userId === target.userId ? { ...u, isActive: !target.isActive } : u)));
-        flashSuccess(target.isActive ? 'User deactivated.' : 'User reactivated.');
-      }
+      await api.put(`/admin/users/${target.userId}/status`, { isActive: !target.isActive });
+      setItems((arr) => arr.map((u) => (u.userId === target.userId ? { ...u, isActive: !target.isActive } : u)));
+      flashSuccess(target.isActive ? 'User deactivated.' : 'User reactivated.');
     } catch (err) {
       setErrorMsg(err.response?.data?.message || 'Failed to update status.');
     }
@@ -107,11 +118,9 @@ function AdminUsersPage() {
   const handleDelete = async (target) => {
     if (!window.confirm(`Deactivate ${target.fullName}? They will no longer be able to sign in.`)) return;
     try {
-      const res = await api.delete(`/admin/users/${target.userId}`);
-      if (res.data.success) {
-        setItems((arr) => arr.map((u) => (u.userId === target.userId ? { ...u, isActive: false } : u)));
-        flashSuccess('User deactivated.');
-      }
+      await api.delete(`/admin/users/${target.userId}`);
+      setItems((arr) => arr.map((u) => (u.userId === target.userId ? { ...u, isActive: false } : u)));
+      flashSuccess('User deactivated.');
     } catch (err) {
       setErrorMsg(err.response?.data?.message || 'Failed to deactivate user.');
     }
@@ -119,7 +128,7 @@ function AdminUsersPage() {
 
   return (
     <AdminPageFrame
-      eyebrow="People Â· Users"
+      eyebrow={`People ${MIDDOT} Users`}
       title="Users"
       sub="Everyone who has an account on GiveAID. Manage roles, status, and access."
       error={errorMsg}
@@ -136,7 +145,7 @@ function AdminUsersPage() {
           <input
             type="text"
             className="af-search-input"
-            placeholder="Search name, email, or usernameâ€¦"
+            placeholder={`Search name, email, or username${ELLIPSIS}`}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -190,9 +199,9 @@ function AdminUsersPage() {
               <tbody>
                 {items.map((u) => {
                   const canEditRole =
-                    isSuperAdmin ||
-                    (u.role === 'User'); // Admin can promote Userâ†’Admin (their own choice)
-                  const canDeactivate = isSuperAdmin || u.userId !== me?.userId;
+                    isAdmin ||
+                    (u.role === 'User'); // Admin can promote User to Admin (their own choice)
+                  const canDeactivate = isAdmin || u.userId !== me?.userId;
 
                   return (
                     <tr key={u.userId}>
@@ -226,7 +235,6 @@ function AdminUsersPage() {
                               <option
                                 key={r}
                                 value={r}
-                                disabled={r === 'SuperAdmin' && !isSuperAdmin}
                               >
                                 {r}
                               </option>
@@ -242,7 +250,7 @@ function AdminUsersPage() {
                         <span className={`af-pill ${u.isActive ? 'af-pill-active' : 'af-pill-completed'}`}>
                           {u.isActive ? 'Active' : 'Inactive'}
                         </span>
-                        {u.isVerified && <span className="ad-verified-tag" title="Email verified">âœ“ Verified</span>}
+                        {u.isVerified && <span className="ad-verified-tag" title="Email verified">Email verified</span>}
                       </td>
                       <td>
                         <div className="af-cell-strong">{u.donationCount}</div>
@@ -266,7 +274,7 @@ function AdminUsersPage() {
                               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
                             )}
                           </button>
-                          {isSuperAdmin && u.userId !== me?.userId && (
+                          {isAdmin && u.userId !== me?.userId && (
                             <button
                               type="button"
                               className="af-icon-btn danger"
@@ -302,7 +310,7 @@ function AdminUsersPage() {
                   disabled={pagination.page <= 1}
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                 >
-                  â€¹ Prev
+                  {`${ANGLE_L} Prev`}
                 </button>
                 <button
                   type="button"
@@ -310,7 +318,7 @@ function AdminUsersPage() {
                   disabled={pagination.page >= pagination.totalPages}
                   onClick={() => setPage((p) => Math.min(pagination.totalPages, p + 1))}
                 >
-                  Next â€º
+                  {`Next ${ANGLE_R}`}
                 </button>
               </div>
             </div>
@@ -325,14 +333,12 @@ function AdminUsersPage() {
   );
 }
 
-/* map role â†’ af-pill-* key */
+/* map role to af-pill-* key */
 function rolePillKey(role) {
   switch (role) {
-    case 'SuperAdmin': return 'cancelled'; /* coral-toned */
     case 'Admin':      return 'ongoing';
     default:           return 'completed';
   }
 }
 
 export default AdminUsersPage;
-

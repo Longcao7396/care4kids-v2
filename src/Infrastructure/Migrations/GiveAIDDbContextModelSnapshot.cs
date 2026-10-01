@@ -242,8 +242,8 @@ namespace GiveAID.V2.Infrastructure.Migrations
                         .HasColumnType("datetime2")
                         .HasColumnName("created_at");
 
-                    b.Property<int?>("CreatedBy")
-                        .HasColumnType("int")
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)")
                         .HasColumnName("created_by");
 
                     b.Property<DateTime?>("DeletedAt")
@@ -1244,9 +1244,10 @@ namespace GiveAID.V2.Infrastructure.Migrations
                         .HasColumnType("nvarchar(max)")
                         .HasColumnName("updated_by");
 
-                    b.Property<int>("UserId")
+                    b.Property<int?>("UserId")
                         .HasColumnType("int")
-                        .HasColumnName("user_id");
+                        .HasColumnName("user_id")
+                        .IsRequired(false);
 
                     b.HasKey("DonationId")
                         .HasName("pk_donations");
@@ -2524,7 +2525,7 @@ namespace GiveAID.V2.Infrastructure.Migrations
                         .WithMany("Donations")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
+                        .IsRequired(false)
                         .HasConstraintName("fk_donations__users_user_id");
 
                     b.Navigation("Campaign");

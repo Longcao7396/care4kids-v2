@@ -23,12 +23,7 @@ const MyRegistrationsPage = () => {
     try {
       setLoading(true);
       const response = await campaignsService.getMyRegistrations();
-      if (response.success) {
-        const list = Array.isArray(response.data)
-          ? response.data
-          : (response.data?.items || []);
-        setRegistrations(list);
-      }
+      setRegistrations(Array.isArray(response) ? response : (response?.items || []));
     } catch (error) {
       console.error('Error loading registrations:', error);
     } finally {

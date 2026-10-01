@@ -44,6 +44,59 @@ const EMPTY_FORM = {
   status: 'Active', isFeatured: false, displayOrder: 0,
 };
 
+/* ── Form field helpers (shared style system with partner/causes admin) ── */
+function Field({
+  label, required, error, hint, children, full,
+}) {
+  return (
+    <div className={`af-field ${full ? 'af-field-full' : ''}`}>
+      <label className="af-label">
+        {label}
+        {required && <span className="af-required" aria-hidden="true">*</span>}
+      </label>
+      {children}
+      {hint && !error && <div className="af-hint">{hint}</div>}
+      {error && <div className="af-error" role="alert">{error}</div>}
+    </div>
+  );
+}
+
+function TextInput({ value, onChange, invalid, ...rest }) {
+  return (
+    <input
+      className={`af-input ${invalid ? 'is-invalid' : ''}`}
+      value={value ?? ''}
+      onChange={onChange}
+      {...rest}
+    />
+  );
+}
+
+function TextArea({ value, onChange, invalid, rows = 4, ...rest }) {
+  return (
+    <textarea
+      className={`af-textarea ${invalid ? 'is-invalid' : ''}`}
+      value={value ?? ''}
+      onChange={onChange}
+      rows={rows}
+      {...rest}
+    />
+  );
+}
+
+function SelectInput({ value, onChange, invalid, children, ...rest }) {
+  return (
+    <select
+      className={`af-select ${invalid ? 'is-invalid' : ''}`}
+      value={value ?? ''}
+      onChange={onChange}
+      {...rest}
+    >
+      {children}
+    </select>
+  );
+}
+
 /* ── Campaign Form Modal ────────────────────── */
 function CampaignFormModal({ show, editing, initial, causes, onSave, onClose }) {
   const [form, setForm] = useState(EMPTY_FORM);
@@ -68,6 +121,7 @@ function CampaignFormModal({ show, editing, initial, causes, onSave, onClose }) 
   }, [show, editing, initial]);
 
   const set = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
+  const toggle = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.checked }));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -89,103 +143,521 @@ function CampaignFormModal({ show, editing, initial, causes, onSave, onClose }) 
     }
   };
 
-  const field = (label, field, as = 'text', placeholder = '') => (
-    <Form.Group className="mb-3">
-      <Form.Label>{label}</Form.Label>
-      <Form.Control
-        type={as} value={form[field]} onChange={set(field)}
-        placeholder={placeholder} isInvalid={!!errors[field]}
-      />
-      {errors[field] && <Form.Control.Feedback type="invalid">{errors[field]}</Form.Control.Feedback>}
-    </Form.Group>
-  );
-
   return (
-    <Modal show={show} onHide={onClose} size="lg" centered className="admin-modal-dark">
+    <Modal
+      show={show}
+      onHide={onClose}
+      centered
+      scrollable
+      size="lg"
+      className="af-form-modal campaign-form-modal"
+      backdrop="static"
+      aria-labelledby="campaign-form-title"
+    >
+      {/* ───── Header ───── */}
       <Modal.Header closeButton>
-        <Modal.Title>
-          <i className={`bi ${editing ? 'bi-pencil-square' : 'bi-plus-circle'} me-2 text-accent`}></i>
-          {editing ? 'Edit Campaign' : 'Create Campaign'}
-        </Modal.Title>
+        <div className="campaign-form-header">
+          <div className="campaign-form-header-icon" aria-hidden="true">
+            <i className={`bi ${editing ? 'bi-pencil-square' : 'bi-plus-circle'}`}></i>
+          </div>
+          <div>
+            <Modal.Title id="campaign-form-title">
+              {editing ? 'Edit Campaign' : 'Create Campaign'}
+            </Modal.Title>
+            <p className="campaign-form-header-sub">
+              {editing
+                ? 'Update this campaign\u2019s goals, dates, and visibility.'
+                : 'Create a new fundraising campaign and define its goals.'}
+            </p>
+          </div>
+        </div>
       </Modal.Header>
-      <Form onSubmit={handleSubmit}>
+
+      <Form onSubmit={handleSubmit} noValidate>
+        {/* ───── Body ───── */}
         <Modal.Body>
-          <Row>
-            <Col md={8}>{field('Campaign Name *', 'campaignName', 'text', 'Clean Water Initiative')}</Col>
-            <Col md={4}>{field('Campaign Code', 'campaignCode', 'text', 'CWI-2025')}</Col>
-          </Row>
-          <Row>
-            <Col md={4}>
-              <Form.Group className="mb-3">
-                <Form.Label>Cause *</Form.Label>
-                <Form.Select
-                  value={form.causeId} onChange={set('causeId')}
-                  isInvalid={!!errors.causeId}
+          {errors._form && (
+            <div className="af-banner af-banner-error mb-3" role="alert">
+              <span>{errors._form}</span>
+            </div>
+          )}
+
+          {/* SECTION 1 — Campaign Identity */}
+          <section className="campaign-form-section" aria-labelledby="sec-identity">
+            <header className="campaign-form-section-header">
+              <h6 id="sec-identity" className="campaign-form-section-title">
+                <i className="bi bi-flag" aria-hidden="true"></i>
+                Campaign Identity
+              </h6>
+              <span className="campaign-form-section-meta">
+                Name, code and the cause this campaign supports
+              </span>
+            </header>
+
+            <div className="campaign-form-grid">
+              <Field label="Campaign Name" required error={errors.campaignName} full>
+                <TextInput
+                  type="text"
+                  value={form.campaignName}
+                  onChange={set('campaignName')}
+                  invalid={!!errors.campaignName}
+                  placeholder="Clean Water Initiative"
+                  autoFocus
+                  maxLength={150}
+                />
+              </Field>
+
+              <Field label="Campaign Code" hint="Short identifier used in URLs and exports (optional).">
+                <TextInput
+                  type="text"
+                  value={form.campaignCode}
+                  onChange={set('campaignCode')}
+                  placeholder="CWI-2025"
+                  maxLength={50}
+                />
+              </Field>
+
+              <Field label="Cause" required error={errors.causeId}>
+                <SelectInput
+                  value={form.causeId}
+                  onChange={set('causeId')}
+                  invalid={!!errors.causeId}
                 >
                   <option value="">— Select Cause —</option>
                   {(causes || []).map((c) => (
                     <option key={c.causeId} value={String(c.causeId)}>{c.causeName}</option>
                   ))}
-                </Form.Select>
-                {errors.causeId && <Form.Control.Feedback type="invalid">{errors.causeId}</Form.Control.Feedback>}
-              </Form.Group>
-            </Col>
-            <Col md={4}>{field('Goal Amount (VND) *', 'goalAmount', 'number', '50000000')}</Col>
-            <Col md={4}>{field('Display Order', 'displayOrder', 'number', '0')}</Col>
-          </Row>
-          {field('Description', 'description', 'textarea', 'Describe the campaign goals and impact...')}
-          <Row>
-            <Col md={4}>{field('Start Date *', 'startDate', 'date')}</Col>
-            <Col md={4}>{field('End Date', 'endDate', 'date')}</Col>
-            <Col md={4}>{field('Location', 'location', 'text', 'Ho Chi Minh City')}</Col>
-          </Row>
-          <Row>
-            <Col md={6}>{field('Image URL', 'imageUrl', 'url', 'https://...')}</Col>
-            <Col md={3}>{field('Beneficiaries', 'beneficiariesCount', 'number', '500')}</Col>
-            <Col md={3}>{field('Target Beneficiaries', 'targetBeneficiaries', 'number', '1000')}</Col>
-          </Row>
-          <Row>
-            <Col md={4}>
-              <Form.Group className="mb-3">
-                <Form.Label>Status</Form.Label>
-                <Form.Select
+                </SelectInput>
+              </Field>
+            </div>
+          </section>
+
+          {/* SECTION 2 — Goal & Schedule */}
+          <section className="campaign-form-section" aria-labelledby="sec-goal">
+            <header className="campaign-form-section-header">
+              <h6 id="sec-goal" className="campaign-form-section-title">
+                <i className="bi bi-bullseye" aria-hidden="true"></i>
+                Goal &amp; Schedule
+              </h6>
+              <span className="campaign-form-section-meta">
+                Fundraising target and the campaign timeline
+              </span>
+            </header>
+
+            <div className="campaign-form-grid">
+              <Field label="Goal Amount (VND)" required error={errors.goalAmount}>
+                <TextInput
+                  type="number"
+                  inputMode="numeric"
+                  min="0"
+                  step="1000"
+                  value={form.goalAmount}
+                  onChange={set('goalAmount')}
+                  invalid={!!errors.goalAmount}
+                  placeholder="50000000"
+                />
+              </Field>
+
+              <Field label="Start Date" required error={errors.startDate}>
+                <TextInput
+                  type="date"
+                  value={form.startDate}
+                  onChange={set('startDate')}
+                  invalid={!!errors.startDate}
+                />
+              </Field>
+
+              <Field label="End Date" error={errors.endDate} hint="Optional. Leave blank for open-ended.">
+                <TextInput
+                  type="date"
+                  value={form.endDate}
+                  onChange={set('endDate')}
+                  invalid={!!errors.endDate}
+                />
+              </Field>
+
+              <Field label="Location" hint="Where this campaign takes place (optional).">
+                <TextInput
+                  type="text"
+                  value={form.location}
+                  onChange={set('location')}
+                  placeholder="Ho Chi Minh City"
+                  maxLength={150}
+                />
+              </Field>
+
+              <Field label="Target Beneficiaries" hint="Expected number of people impacted.">
+                <TextInput
+                  type="number"
+                  inputMode="numeric"
+                  min="0"
+                  step="1"
+                  value={form.targetBeneficiaries}
+                  onChange={set('targetBeneficiaries')}
+                  placeholder="1000"
+                />
+              </Field>
+
+              <Field label="Current Beneficiaries" hint="People already impacted so far.">
+                <TextInput
+                  type="number"
+                  inputMode="numeric"
+                  min="0"
+                  step="1"
+                  value={form.beneficiariesCount}
+                  onChange={set('beneficiariesCount')}
+                  placeholder="500"
+                />
+              </Field>
+            </div>
+          </section>
+
+          {/* SECTION 3 — Presentation */}
+          <section className="campaign-form-section" aria-labelledby="sec-presentation">
+            <header className="campaign-form-section-header">
+              <h6 id="sec-presentation" className="campaign-form-section-title">
+                <i className="bi bi-image" aria-hidden="true"></i>
+                Presentation
+              </h6>
+              <span className="campaign-form-section-meta">
+                Image, description and how the campaign is ordered
+              </span>
+            </header>
+
+            <div className="campaign-form-grid">
+              <Field label="Image URL" hint="JPG/PNG/SVG. Square or 16:9 works best.">
+                <TextInput
+                  type="url"
+                  value={form.imageUrl}
+                  onChange={set('imageUrl')}
+                  placeholder="https://..."
+                  maxLength={500}
+                />
+              </Field>
+
+              <Field label="Display Order" hint="Lower numbers appear first.">
+                <TextInput
+                  type="number"
+                  inputMode="numeric"
+                  min="0"
+                  step="1"
+                  value={form.displayOrder}
+                  onChange={set('displayOrder')}
+                  placeholder="0"
+                />
+              </Field>
+
+              <Field label="Description" required full>
+                <TextArea
+                  value={form.description}
+                  onChange={set('description')}
+                  rows={4}
+                  placeholder="Describe the campaign goals, beneficiaries, and the impact donations will make..."
+                  maxLength={2000}
+                />
+              </Field>
+            </div>
+          </section>
+
+          {/* SECTION 4 — Visibility & Status */}
+          <section className="campaign-form-section" aria-labelledby="sec-visibility">
+            <header className="campaign-form-section-header">
+              <h6 id="sec-visibility" className="campaign-form-section-title">
+                <i className="bi bi-eye" aria-hidden="true"></i>
+                Visibility &amp; Status
+              </h6>
+              <span className="campaign-form-section-meta">
+                Controls who can see this campaign on the public site
+              </span>
+            </header>
+
+            <div className="campaign-form-grid">
+              <Field label="Status" error={errors.status} hint="Set to Completed or Cancelled to remove it from active listings.">
+                <SelectInput
                   value={form.status}
                   onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
-                  isInvalid={!!errors.status}
+                  invalid={!!errors.status}
                 >
                   {CAMPAIGN_STATUSES.map((s) => (
                     <option key={s} value={s}>{s}</option>
                   ))}
-                </Form.Select>
-                {errors.status && <Form.Control.Feedback type="invalid">{errors.status}</Form.Control.Feedback>}
-                <Form.Text className="text-muted">
-                  Set to Completed/Cancelled once the campaign ends to hide it from active listings.
-                </Form.Text>
-              </Form.Group>
-            </Col>
-            <Col md={3}>{field('Display Order', 'displayOrder', 'number', '0')}</Col>
-            <Col md={5} className="d-flex align-items-end">
-              <Form.Check
-                type="switch" id="camp-is-featured" label="Featured on homepage"
-                checked={form.isFeatured}
-                onChange={(e) => setForm((f) => ({ ...f, isFeatured: e.target.checked }))}
-                className="mb-3"
-              />
-            </Col>
-          </Row>
+                </SelectInput>
+              </Field>
+
+              <div className="af-field">
+                <label className="af-label">Featured</label>
+                <label className="af-checkbox-row campaign-form-featured" htmlFor="camp-is-featured">
+                  <input
+                    id="camp-is-featured"
+                    type="checkbox"
+                    checked={!!form.isFeatured}
+                    onChange={toggle('isFeatured')}
+                  />
+                  <span>
+                    <strong>Featured campaign</strong>
+                    <small className="campaign-form-toggle-hint">
+                      Highlighted on the homepage and in featured lists.
+                    </small>
+                  </span>
+                </label>
+              </div>
+            </div>
+          </section>
         </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={onClose} disabled={saving}>Cancel</Button>
-          <Button variant="primary" type="submit" disabled={saving}>
-            {saving ? (
-              <><Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" className="me-2" />Saving...</>
-            ) : (
-              <><i className={`bi ${editing ? 'bi-check-circle' : 'bi-plus-circle'} me-2`}></i>
-              {editing ? 'Update Campaign' : 'Create Campaign'}</>
-            )}
-          </Button>
+
+        {/* ───── Footer ───── */}
+        <Modal.Footer className="campaign-form-footer">
+          <span className="campaign-form-footer-hint">
+            <i className="bi bi-info-circle" aria-hidden="true"></i>
+            Fields marked with <span className="af-required">*</span> are required.
+          </span>
+          <div className="campaign-form-footer-actions">
+            <button
+              type="button"
+              className="af-btn af-btn-secondary"
+              onClick={onClose}
+              disabled={saving}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="af-btn af-btn-primary"
+              disabled={saving}
+            >
+              {saving ? (
+                <>
+                  <Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" />
+                  <span>{editing ? 'Saving…' : 'Creating…'}</span>
+                </>
+              ) : (
+                <>
+                  <i className={`bi ${editing ? 'bi-check-circle' : 'bi-plus-circle'}`} aria-hidden="true"></i>
+                  <span>{editing ? 'Save Changes' : 'Create Campaign'}</span>
+                </>
+              )}
+            </button>
+          </div>
         </Modal.Footer>
       </Form>
+
+      <style>{`
+        /* ==========================================================
+           Campaign form — overrides to align with the af-form-modal
+           design system used by all admin CRUD pages.
+           ========================================================== */
+        .campaign-form-modal .modal-dialog {
+          max-width: 780px;
+          width: calc(100vw - 40px);
+          margin: 1.75rem auto;
+        }
+        .campaign-form-modal .modal-content {
+          border: 0;
+          border-radius: 16px;
+          box-shadow: 0 24px 60px rgba(15, 23, 42, 0.22);
+          overflow: hidden;
+        }
+        .campaign-form-modal .modal-header {
+          padding: 22px 26px 18px;
+          border-bottom: 1px solid var(--c4k-gray-100, #F3F4F6);
+          background: linear-gradient(180deg, #FAFBFC 0%, #FFFFFF 100%);
+          align-items: flex-start;
+        }
+        .campaign-form-modal .modal-header .btn-close {
+          margin-top: 6px;
+        }
+        .campaign-form-header {
+          display: flex;
+          align-items: flex-start;
+          gap: 14px;
+          width: 100%;
+        }
+        .campaign-form-header-icon {
+          flex-shrink: 0;
+          width: 40px;
+          height: 40px;
+          border-radius: 10px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          background: linear-gradient(135deg, rgba(14,116,144,0.10), rgba(231,111,81,0.10));
+          color: var(--c4k-teal-dark, #0A5C73);
+          font-size: 1.15rem;
+        }
+        .campaign-form-modal .modal-title {
+          font-family: var(--font-serif, Georgia, serif);
+          font-size: 1.25rem;
+          font-weight: 700;
+          color: var(--c4k-charcoal, #1A1A1A);
+          letter-spacing: -0.02em;
+          line-height: 1.25;
+          margin: 0;
+        }
+        .campaign-form-header-sub {
+          margin: 4px 0 0;
+          font-size: 0.8125rem;
+          color: var(--c4k-gray-600, #4B5563);
+          line-height: 1.45;
+          max-width: 64ch;
+        }
+
+        /* Body */
+        .campaign-form-modal .modal-body {
+          padding: 22px 26px 8px;
+        }
+
+        /* Sections */
+        .campaign-form-section {
+          padding: 18px 0 22px;
+          border-bottom: 1px dashed var(--c4k-gray-200, #E5E7EB);
+        }
+        .campaign-form-section:first-child { padding-top: 4px; }
+        .campaign-form-section:last-of-type { border-bottom: 0; padding-bottom: 4px; }
+
+        .campaign-form-section-header {
+          display: flex;
+          align-items: baseline;
+          flex-wrap: wrap;
+          gap: 10px;
+          margin-bottom: 14px;
+        }
+        .campaign-form-section-title {
+          font-size: 0.6875rem;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.12em;
+          color: var(--c4k-teal-dark, #0A5C73);
+          margin: 0;
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+        }
+        .campaign-form-section-title i {
+          font-size: 0.95rem;
+          color: var(--c4k-coral, #E76F51);
+        }
+        .campaign-form-section-meta {
+          font-size: 0.75rem;
+          color: var(--c4k-gray-500, #6B7280);
+        }
+
+        /* Field grid: 2 columns desktop, 1 column mobile */
+        .campaign-form-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 14px 16px;
+        }
+        .campaign-form-grid > .af-field-full {
+          grid-column: 1 / -1;
+        }
+        @media (max-width: 575px) {
+          .campaign-form-grid { grid-template-columns: 1fr; }
+        }
+
+        /* Inline error state on inputs */
+        .campaign-form-modal .af-input.is-invalid,
+        .campaign-form-modal .af-textarea.is-invalid,
+        .campaign-form-modal .af-select.is-invalid {
+          border-color: var(--c4k-danger, #B91C1C);
+          box-shadow: 0 0 0 3px rgba(185, 28, 28, 0.10);
+        }
+
+        /* Featured toggle: clean horizontal layout */
+        .campaign-form-featured {
+          display: flex;
+          align-items: flex-start;
+          gap: 12px;
+          padding: 12px 14px;
+        }
+        .campaign-form-featured input {
+          margin-top: 2px;
+          width: 16px;
+          height: 16px;
+          flex-shrink: 0;
+          accent-color: var(--c4k-teal, #0E7490);
+        }
+        .campaign-form-featured span {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+          font-size: 0.875rem;
+          color: var(--c4k-charcoal, #1A1A1A);
+        }
+        .campaign-form-toggle-hint {
+          font-size: 0.75rem;
+          color: var(--c4k-gray-500, #6B7280);
+          font-weight: 400;
+        }
+
+        /* Footer */
+        .campaign-form-footer {
+          padding: 16px 26px 20px;
+          border-top: 1px solid var(--c4k-gray-100, #F3F4F6);
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 14px;
+          flex-wrap: wrap;
+          background: #fff;
+        }
+        .campaign-form-footer-hint {
+          font-size: 0.75rem;
+          color: var(--c4k-gray-500, #6B7280);
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+        }
+        .campaign-form-footer-actions {
+          display: inline-flex;
+          gap: 10px;
+          flex-shrink: 0;
+        }
+
+        @media (max-width: 575px) {
+          .campaign-form-footer {
+            flex-direction: column-reverse;
+            align-items: stretch;
+          }
+          .campaign-form-footer-actions { width: 100%; }
+          .campaign-form-footer-actions .af-btn { flex: 1; }
+        }
+
+        /* Constrain the modal to the viewport. The Form wraps body+footer
+           so we set up the same flex column on both the modal-content and
+           the form so the body fills remaining height and overflows. */
+        .campaign-form-modal.show .modal-dialog {
+          max-height: calc(100vh - 32px);
+        }
+        /* The dialog is vertically centered (align-items: center). Force the
+           modal-content to stretch to the dialog's full height so the
+           body can scroll inside it. */
+        .campaign-form-modal .modal-content {
+          align-self: stretch;
+          max-height: calc(100vh - 32px);
+          display: flex;
+          flex-direction: column;
+          min-height: 0;
+        }
+        /* The Form wraps body + footer; it must also be a flex column
+           that fills the modal-content box. */
+        .campaign-form-modal .modal-content > form {
+          display: flex;
+          flex-direction: column;
+          flex: 1 1 auto;
+          min-height: 0;
+        }
+        /* min-height:0 lets the body shrink below its content height so
+           the overflow-y scrollbar can engage. */
+        .campaign-form-modal .modal-body {
+          flex: 1 1 0;
+          min-height: 0;
+          overflow-y: auto;
+        }
+        .campaign-form-modal .modal-header,
+        .campaign-form-modal .modal-footer {
+          flex: 0 0 auto;
+        }
+      `}</style>
     </Modal>
   );
 }
@@ -193,7 +665,7 @@ function CampaignFormModal({ show, editing, initial, causes, onSave, onClose }) 
 /* ── Admin Campaign Page ────────────────────── */
 export default function AdminCampaignPage() {
   const { user } = useAuth();
-  const canAccess = user?.role === 'Admin' || user?.role === 'SuperAdmin';
+  const canAccess = user?.role === 'Admin';
 
   const [campaigns, setCampaigns] = useState([]);
   const [causes, setCauses] = useState([]);
@@ -214,7 +686,8 @@ export default function AdminCampaignPage() {
       setLoading(true);
       setError(null);
       const res = await api.get('/campaigns', { params: { pageSize: 100, page: 1 } });
-      if (res.data.success) setCampaigns(res.data.data || []);
+      // api interceptor unwraps envelope → res is { items, totalCount, page, pageSize }
+      setCampaigns(Array.isArray(res.items) ? res.items : []);
     } catch {
       setError('Failed to load campaigns.');
     } finally {
@@ -225,7 +698,8 @@ export default function AdminCampaignPage() {
   const fetchCauses = useCallback(async () => {
     try {
       const res = await api.get('/causes', { params: { activeOnly: false } });
-      if (res.data.success) setCauses(res.data.data || []);
+      // res is array of cause objects
+      setCauses(Array.isArray(res) ? res : []);
     } catch { /* non-fatal */ }
   }, []);
 
@@ -239,7 +713,7 @@ export default function AdminCampaignPage() {
     setDetailItem(null);
     try {
       const res = await api.get(`/campaigns/${item.campaignId}`);
-      if (res.data.success) setDetailItem(res.data.data);
+      setDetailItem(res); // res is the campaign object itself
     } catch { setDetailItem(item); }
   };
 
@@ -428,7 +902,7 @@ export default function AdminCampaignPage() {
                             <button type="button" className="af-icon-btn" onClick={() => openEdit(c)} title="Edit" aria-label="Edit">
                               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                             </button>
-                            {user?.role === 'SuperAdmin' && (
+                            {user?.role === 'Admin' && (
                               <button type="button" className="af-icon-btn danger" onClick={() => setDeleteConfirm(c.campaignId)} title="Delete" aria-label="Delete">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>
                               </button>
@@ -633,13 +1107,14 @@ function CausesAdminTab({ causes: externalCauses, setCauses: setExternalCauses }
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({});
   const [deleteConfirm, setDeleteConfirm] = useState(null);
-  const isSuperAdmin = JSON.parse(localStorage.getItem('giveaid_user') || '{}')?.role === 'SuperAdmin';
+  const { user: innerUser } = useAuth();
+  const isAdmin = innerUser?.role === 'Admin';
 
   const load = useCallback(async () => {
     try {
       setLoading(true);
       const res = await api.get('/causes', { params: { activeOnly: false } });
-      if (res.data.success) setCauses(res.data.data || []);
+      setCauses(Array.isArray(res) ? res : []);
     } catch {
       setError('Failed to load causes.');
     } finally {
@@ -719,7 +1194,7 @@ function CausesAdminTab({ causes: externalCauses, setCauses: setExternalCauses }
 
       <div className="d-flex justify-content-between align-items-center mb-3">
         <h4 className="text-light mb-0">Causes / Categories</h4>
-        {isSuperAdmin && (
+        {isAdmin && (
           <Button variant="primary" onClick={openCreate}>
             <i className="bi bi-plus-circle me-2"></i>Add Cause
           </Button>
@@ -792,7 +1267,7 @@ function CausesAdminTab({ causes: externalCauses, setCauses: setExternalCauses }
                   </td>
                   <td className="text-end">
                     <Button variant="outline-primary" size="sm" onClick={() => openEdit(c)}>Edit</Button>
-                    {isSuperAdmin && (
+                    {isAdmin && (
                       <Button variant="outline-danger" size="sm" className="ms-1" onClick={() => setDeleteConfirm(c.causeId)}>Delete</Button>
                     )}
                   </td>

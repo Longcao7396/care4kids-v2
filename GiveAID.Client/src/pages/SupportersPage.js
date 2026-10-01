@@ -98,9 +98,7 @@ function SupportersPage() {
       const params = { activeOnly: true };
       if (type) params.type = type;
       const response = await api.get('/supporters', { params });
-      if (response.data.success) {
-        setItems(response.data.data || []);
-      }
+      setItems(Array.isArray(response) ? response : (response?.items || []));
     } catch (err) {
       setError('Failed to load supporters.');
     } finally {
@@ -111,9 +109,7 @@ function SupportersPage() {
   const fetchStats = useCallback(async () => {
     try {
       const response = await api.get('/supporters/stats');
-      if (response.data.success) {
-        setStats(response.data.data);
-      }
+      setStats(response || null);
     } catch (err) {
       // Non-fatal
     }

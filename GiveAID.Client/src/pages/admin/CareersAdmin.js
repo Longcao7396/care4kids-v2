@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card, Table, Badge, Alert, Button, Modal, Form, Spinner, ButtonGroup } from 'react-bootstrap';
 import api from '../../services/api';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function CareersAdmin() {
   const [items, setItems] = useState([]);
@@ -17,7 +18,7 @@ export default function CareersAdmin() {
     try {
       setLoading(true);
       const response = await api.get('/careers', { params: { activeOnly: false } });
-      if (response.data.success) setItems(response.data.data || []);
+      setItems(Array.isArray(response) ? response : (response?.items || []));
     } catch (err) {
       setError('Failed to load careers.');
     } finally {
@@ -67,16 +68,16 @@ export default function CareersAdmin() {
         postedDate: form.postedDate || new Date().toISOString().slice(0, 10),
         closingDate: form.closingDate || null,
       };
-      const response = editing
-        ? await api.put(`/careers/${editing.careerId}`, payload)
-        : await api.post('/careers', payload);
-      if (response.data.success) {
-        setSuccess(editing ? 'Career updated.' : 'Career posted.');
-        setShowModal(false);
-        load();
+      if (editing) {
+        await api.put(`/careers/${editing.careerId}`, payload);
+      } else {
+        await api.post('/careers', payload);
       }
+      setSuccess(editing ? 'Career updated.' : 'Career posted.');
+      setShowModal(false);
+      load();
     } catch (err) {
-      setError('Save failed.');
+      setError(err.message || 'Save failed.');
     }
   };
 
@@ -95,13 +96,14 @@ export default function CareersAdmin() {
     setViewing(item);
     try {
       const response = await api.get(`/careers/${item.careerId}/applications`);
-      if (response.data.success) setApplications(response.data.data || []);
+      setApplications(Array.isArray(response) ? response : (response?.items || []));
     } catch (err) {
       setApplications([]);
     }
   };
 
-  const isSuperAdmin = JSON.parse(localStorage.getItem('giveaid_user') || '{}')?.role === 'SuperAdmin';
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'Admin';
 
   return (
     <div>
@@ -148,7 +150,7 @@ export default function CareersAdmin() {
                     <ButtonGroup size="sm">
                       <Button variant="outline-info" onClick={() => viewApplications(c)}>Applications</Button>
                       <Button variant="outline-primary" onClick={() => openEdit(c)}>Edit</Button>
-                      {isSuperAdmin && (
+                      {isAdmin && (
                         <Button variant="outline-danger" onClick={() => handleDelete(c)}>Delete</Button>
                       )}
                     </ButtonGroup>

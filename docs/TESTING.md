@@ -81,7 +81,7 @@ A test should verify **one behaviour**. Use multiple `[Fact]`s rather than chain
 Use constants or test data builders when strings are repeated:
 
 ```csharp
-private const string AdminEmail = "admin@give-aid.org";
+private const string AdminUsername = "admin";
 private const string AdminPassword = "Admin@123";
 ```
 

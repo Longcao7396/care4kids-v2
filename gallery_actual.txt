@@ -1,0 +1,45 @@
+﻿
+ID Title                          Category   
+-- -----                          --------   
+ 1 Lớp học vùng cao               education  
+ 2 Cứu trợ lũ lụt miền Trung      relief     
+ 3 Nụ cười của em                 portraits  
+ 4 Khám sức khỏe định kỳ          health     
+ 5 Em đọc sách ở thư viện làng    education  
+ 6 Tiêm chủng mở rộng             health     
+ 7 Bữa cơm có thịt                health     
+ 8 Giếng nước sạch cho bản làng   water      
+ 9 Trồng rau cùng các em          environment
+10 Tình nguyện viên dạy tiếng Anh community  
+11 Mổ tim nhân đạo                health     
+12 Dọn dẹp sau lũ                 relief     
+13 Chân dung em bé vùng cao       portraits  
+14 Charity Run 2026               events     
+15 Xây nhà tình thương            community  
+16 Phát thuốc miễn phí            community  
+17 Hoạt động học tập vùng cao     education  
+18 Em nhỏ và sách vở              education  
+19 Trải nghiệm với các em         portraits  
+20 Em nhỏ vui chơi                community  
+21 Niềm vui của trẻ thơ           portraits  
+22 Ngày mới của các em            portraits  
+23 Tình nguyện viên hỗ trợ các em community  
+24 Hoạt động cộng đồng            community  
+25 Chương trình cứu trợ           relief     
+26 Chăm sóc em nhỏ                community  
+27 Lớp học ngoài trời             education  
+28 Sự kiện tình nguyện            community  
+29 Nụ cười em nhỏ                 community  
+30 Hành trình sẻ chia             community  
+31 Lớp học hy vọng                education  
+32 Chăm sóc sức khỏe              health     
+33 Y tế cho em vùng cao           health     
+34 Ngày hội sẻ chia               community  
+35 Hành động vì cộng đồng         community  
+36 Đọc sách cùng em               education  
+37 Cứu trợ khẩn cấp               relief     
+38 Sự kiện gây quỹ                events     
+39 Giao lưu cộng đồng             community  
+40 Lớp học cho em                 education  
+
+

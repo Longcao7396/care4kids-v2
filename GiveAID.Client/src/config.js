@@ -186,7 +186,6 @@ export const API_ENDPOINTS = {
 };
 
 // App Settings
-export const APP_NAME = 'Care4Kids';
 export const APP_DESCRIPTION = "Children's Welfare & Donation Management System";
 
 // Pagination
@@ -198,9 +197,9 @@ export const STORAGE_KEYS = {
   USER: 'giveaid_user',
 };
 
-// User Roles
+// User Roles. The application has a single highest administrative role,
+// "Admin". There is no SuperAdmin role.
 export const USER_ROLES = {
-  SUPER_ADMIN: 'SuperAdmin',
   ADMIN: 'Admin',
   CONTENT_MANAGER: 'ContentManager',
   USER: 'User',
@@ -213,12 +212,6 @@ export const PAYMENT_METHODS = {
   NET_BANKING: 'NetBanking',
 };
 
-// Cause Codes
-export const CAUSE_CODES = {
-  CHILD: 'CHILD',
-  EDU: 'EDU',
-  DIS: 'DIS',
-  WOMAN: 'WOMAN',
-  YOUTH: 'YOUTH',
-  ELDER: 'ELDER',
-};
+// NOTE: Cause codes are now driven by the backend `causes` table (single
+// source of truth). The Causes API is the authoritative source; the admin
+// UI should never hard-code a Care4Kids Cause whitelist.

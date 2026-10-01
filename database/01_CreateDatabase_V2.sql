@@ -707,20 +707,22 @@ END
 GO
 
 -- 6.2 Seed parent causes (only if empty)
+-- Care4Kids only: Education for Children, Healthcare Support, Child Welfare.
+-- Generic NGO categories (Women Empowerment, Environment, Emergency Relief,
+-- Elderly Care, Disability Support, Animal Welfare) are intentionally NOT
+-- seeded because they don't match the Care4Kids platform theme. The Donation
+-- page dropdown sources its data via GET /api/v1/causes/tree and must only
+-- see Care4Kids-aligned causes. See database/Deactivate_NonCare4Kids_Causes.sql
+-- for the soft-deactivation script for existing databases that already have
+-- the older seed.
 IF NOT EXISTS (SELECT 1 FROM causes)
 BEGIN
-    PRINT '>>> Seeding causes (parent + sub)';
+    PRINT '>>> Seeding causes (Care4Kids parent + sub)';
     SET IDENTITY_INSERT causes ON;
     INSERT INTO causes (cause_id, cause_code, cause_name, description, icon, target_amount, raised_amount, is_active, display_order, parent_cause_id, created_at, updated_at) VALUES
         (1, 'EDU',     N'Education for Children',  N'Support education initiatives for underprivileged children', 'graduation-cap', 500000000, 0, 1, 1, NULL, GETDATE(), NULL),
         (2, 'HEALTH',  N'Healthcare Support',      N'Provide healthcare access to those in need',                'heartbeat',      750000000, 0, 1, 2, NULL, GETDATE(), NULL),
         (3, 'CHILD',   N'Child Welfare',           N'Protect and support vulnerable children',                   'child',          400000000, 0, 1, 3, NULL, GETDATE(), NULL),
-        (4, 'WOMEN',   N'Women Empowerment',       N'Empower women through education and opportunity',          'female',         350000000, 0, 1, 4, NULL, GETDATE(), NULL),
-        (5, 'ENV',     N'Environment',             N'Protect our environment for future generations',           'leaf',           300000000, 0, 1, 5, NULL, GETDATE(), NULL),
-        (6, 'EMERG',   N'Emergency Relief',        N'Respond to natural disasters and emergencies',             'exclamation-triangle', 1000000000, 0, 1, 6, NULL, GETDATE(), NULL),
-        (7, 'ELDER',   N'Elderly Care',            N'Support programs for senior citizens',                     'blind',          250000000, 0, 1, 7, NULL, GETDATE(), NULL),
-        (8, 'DIS',     N'Disability Support',      N'Assist people with disabilities',                          'wheelchair',     300000000, 0, 1, 8, NULL, GETDATE(), NULL),
-        (9, 'ANIMAL',  N'Animal Welfare',          N'Protect and care for animals in need',                     'paw',            200000000, 0, 1, 9, NULL, GETDATE(), NULL),
         -- sub-causes for EDU
         (10, 'EDU-BOOK',     N'School Supplies',     N'Provide books, uniforms, and stationery',              NULL,  50000000,  0, 1, 1, 1,  GETDATE(), NULL),
         (11, 'EDU-SCHOLAR',  N'Scholarships',        N'Fund educational scholarships',                         NULL, 100000000,  0, 1, 2, 1,  GETDATE(), NULL),
@@ -731,13 +733,7 @@ BEGIN
         (15, 'HEALTH-MH',    N'Mental Health',       N'Mental health awareness and support',                   NULL,  75000000,  0, 1, 3, 2,  GETDATE(), NULL),
         -- sub-causes for CHILD
         (16, 'CHILD-SHELTER',N'Child Shelters',      N'Safe houses for children',                              NULL, 100000000,  0, 1, 1, 3,  GETDATE(), NULL),
-        (17, 'CHILD-NUTR',   N'Nutrition',           N'Fight child malnutrition',                              NULL,  75000000,  0, 1, 2, 3,  GETDATE(), NULL),
-        -- sub-causes for WOMEN
-        (18, 'WOMEN-ENT',    N'Entrepreneurship',    N'Support women-owned businesses',                        NULL, 100000000,  0, 1, 1, 4,  GETDATE(), NULL),
-        (19, 'WOMEN-SHELTER',N'Safe Housing',        N'Shelters for women in need',                            NULL,  75000000,  0, 1, 2, 4,  GETDATE(), NULL),
-        -- sub-causes for EMERG
-        (20, 'EMERG-FLOOD',  N'Flood Relief',        N'Aid for flood victims',                                 NULL, 200000000,  0, 1, 1, 6,  GETDATE(), NULL),
-        (21, 'EMERG-QUAKE',  N'Earthquake Relief',   N'Support earthquake survivors',                           NULL, 250000000,  0, 1, 2, 6,  GETDATE(), NULL);
+        (17, 'CHILD-NUTR',   N'Nutrition',           N'Fight child malnutrition',                              NULL,  75000000,  0, 1, 2, 3,  GETDATE(), NULL);
     SET IDENTITY_INSERT causes OFF;
 END
 GO
@@ -764,7 +760,7 @@ PRINT 'GiveAID V2 — Database setup COMPLETE.';
 PRINT 'Tables created: 22';
 PRINT 'Indexes created: ~40';
 PRINT 'Views created:   7';
-PRINT 'Seed data:       11 CMS pages, 21 causes, 6 FAQs';
+PRINT 'Seed data:       11 CMS pages, 11 causes (3 Care4Kids parents + 8 sub-causes), 6 FAQs';
 PRINT '';
 PRINT 'IMPORTANT: Admin user is seeded by the application, NOT by this SQL script.';
 PRINT 'For Development: Start API with ASPNETCORE_ENVIRONMENT=Development to auto-seed.';

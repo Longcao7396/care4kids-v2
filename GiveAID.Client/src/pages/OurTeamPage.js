@@ -26,13 +26,9 @@ function OurTeamPage() {
       const params = { activeOnly: true, pageSize: 100 };
       if (department) params.department = department;
       const response = await api.get('/team', { params });
-      if (response.data.success) {
-        // Backend returns either {items,...} or a bare array depending on
-        // controller version — normalise both.
-        const data = response.data.data;
-        const list = Array.isArray(data) ? data : (data?.items || []);
-        setMembers(list);
-      }
+      // Backend returns either {items,...} or a bare array depending on
+      // controller version — normalise both.
+      setMembers(Array.isArray(response) ? response : (response?.items || []));
     } catch (err) {
       setError('Failed to load team members.');
     } finally {
@@ -43,9 +39,7 @@ function OurTeamPage() {
   const fetchCmsPage = useCallback(async () => {
     try {
       const response = await api.get('/cms/pages/our_team');
-      if (response.data.success) {
-        setCmsPage(response.data.data);
-      }
+      setCmsPage(response || null);
     } catch (err) {
       // Non-fatal — page content is optional.
     }

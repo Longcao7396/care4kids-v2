@@ -1,5 +1,6 @@
 using GiveAID.Application.Common.Interfaces;
 using GiveAID.Application.Features.Auth.DTOs;
+using GiveAID.Application.Services;
 using GiveAID.Domain.Entities;
 using GiveAID.Domain.Exceptions;
 using MediatR;
@@ -23,19 +24,22 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, UserDto>
     private readonly IEmailSender _emailSender;
     private readonly ILogger<RegisterCommandHandler> _logger;
     private readonly IOptions<EmailOptions> _emailOptions;
+    private readonly ICacheService _cacheService;
 
     public RegisterCommandHandler(
         IApplicationDbContext context,
         IPasswordHasher passwordHasher,
         IEmailSender emailSender,
         ILogger<RegisterCommandHandler> logger,
-        IOptions<EmailOptions> emailOptions)
+        IOptions<EmailOptions> emailOptions,
+        ICacheService cacheService)
     {
         _context = context;
         _passwordHasher = passwordHasher;
         _emailSender = emailSender;
         _logger = logger;
         _emailOptions = emailOptions;
+        _cacheService = cacheService;
     }
 
     public async Task<UserDto> Handle(RegisterCommand request, CancellationToken cancellationToken)
@@ -82,6 +86,9 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, UserDto>
             }
             throw;
         }
+
+        // Invalidate dashboard statistics cache — new user changes registeredUsers count.
+        _cacheService.InvalidateStatistics();
 
         // Send welcome email (fire-and-forget; failures must not break registration)
         try

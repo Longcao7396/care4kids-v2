@@ -6,7 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
  * ProtectedRoute
  *   props:
  *     - children  (required) : the protected element
- *     - roles     (optional) : ['Admin', 'SuperAdmin']; if omitted
+ *     - roles     (optional) : ['Admin']; if omitted
  *                              only requires authentication.
  *
  *   Behavior:

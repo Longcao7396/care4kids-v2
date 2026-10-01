@@ -1,3 +1,4 @@
+using GiveAID.Application.Features.Organizations.Commands;
 using GiveAID.Application.Features.Organizations.DTOs;
 using GiveAID.Application.Features.Organizations.Queries.GetAll;
 using GiveAID.Application.Features.Organizations.Queries.GetFeatured;
@@ -93,16 +94,30 @@ public class OrganizationsController : ControllerBase
     }
 
     /// <summary>
-    /// Create an organization (Admin only).
+    /// Create an organization (Admin only). Mirrors the structure used by
+    /// the admin Partner Management form.
     /// </summary>
     [HttpPost]
     [Authorize(Policy = "RequireAdmin")]
-    public IActionResult Create([FromBody] object request)
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(object), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(object), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> Create([FromBody] CreateOrganizationCommand command, CancellationToken ct)
     {
-        // Write path is intentionally a stub here — POST goes through admin
-        // management screens which have their own controllers; keep this
-        // public unauthenticated endpoint minimal until admin endpoint is wired.
-        return StatusCode(501, new { success = false, message = "Create not yet implemented", data = (object?)null });
+        try
+        {
+            var id = await _mediator.Send(command, ct);
+            var dto = await GetOneDtoAsync(id, ct);
+            return Ok(new { success = true, message = "Organization created", data = dto });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { success = false, message = ex.Message, data = (object?)null });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { success = false, message = ex.Message, data = (object?)null });
+        }
     }
 
     /// <summary>
@@ -110,18 +125,58 @@ public class OrganizationsController : ControllerBase
     /// </summary>
     [HttpPut("{id:int}")]
     [Authorize(Policy = "RequireAdmin")]
-    public IActionResult Update(int id, [FromBody] object request)
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(object), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(object), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(object), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> Update(int id, [FromBody] UpdateOrganizationCommand command, CancellationToken ct)
     {
-        return StatusCode(501, new { success = false, message = "Update not yet implemented", data = (object?)null });
+        command.OrganizationId = id;
+        try
+        {
+            await _mediator.Send(command, ct);
+            var dto = await GetOneDtoAsync(id, ct);
+            return Ok(new { success = true, message = "Organization updated", data = dto });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { success = false, message = ex.Message, data = (object?)null });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { success = false, message = ex.Message, data = (object?)null });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { success = false, message = ex.Message, data = (object?)null });
+        }
     }
 
     /// <summary>
-    /// Delete an organization (Admin only).
+    /// Soft-delete an organization (Admin only). The row is preserved and
+    /// hidden from public reads.
     /// </summary>
     [HttpDelete("{id:int}")]
     [Authorize(Policy = "RequireAdmin")]
-    public IActionResult Delete(int id)
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(object), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(object), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> Delete(int id, CancellationToken ct)
     {
-        return StatusCode(501, new { success = false, message = "Delete not yet implemented", data = (object?)null });
+        try
+        {
+            await _mediator.Send(new DeleteOrganizationCommand { OrganizationId = id }, ct);
+            return Ok(new { success = true, message = "Organization deactivated", data = (object?)null });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { success = false, message = ex.Message, data = (object?)null });
+        }
+    }
+
+    private async Task<OrganizationDto?> GetOneDtoAsync(int id, CancellationToken ct)
+    {
+        var all = await _mediator.Send(new GetAllOrganizationsQuery { ActiveOnly = false }, ct);
+        return all.FirstOrDefault(o => o.OrganizationId == id);
     }
 }

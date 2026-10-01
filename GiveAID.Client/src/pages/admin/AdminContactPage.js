@@ -11,7 +11,7 @@ const PER_PAGE = 20;
 
 function ContactList({ contacts, total, page, onPageChange, onSelect, onRefresh }) {
   const { user } = useAuth();
-  const isSuperAdmin = user?.role === 'SuperAdmin';
+  const isAdmin = user?.role === 'Admin';
 
   const handleToggleRead = async (id, e) => {
     e.stopPropagation();
@@ -120,7 +120,7 @@ function ContactList({ contacts, total, page, onPageChange, onSelect, onRefresh 
                     >
                       <i className={`bi ${c.isRead ? 'bi-envelope' : 'bi-envelope-open'}`}></i>
                     </Button>
-                    {isSuperAdmin && (
+                    {isAdmin && (
                       <Button
                         variant="outline-danger"
                         size="sm"
@@ -176,6 +176,29 @@ function ContactList({ contacts, total, page, onPageChange, onSelect, onRefresh 
           border-radius: 50%;
           background: var(--accent-sky);
           margin: 0 auto;
+        }
+        /* Override Bootstrap pagination colors to match Care4Kids admin theme (teal) */
+        .pagination .page-link {
+          color: var(--c4k-charcoal, #1A1A1A);
+          background-color: #fff;
+          border-color: var(--c4k-gray-200, #E5E7EB);
+          transition: all 0.15s ease;
+        }
+        .pagination .page-link:hover:not(.disabled) {
+          color: var(--c4k-teal, #0E7490);
+          background-color: var(--c4k-gray-50, #F9FAFB);
+          border-color: var(--c4k-gray-300, #D1D5DB);
+        }
+        .pagination .page-item.active .page-link {
+          background-color: var(--c4k-teal, #0E7490);
+          border-color: var(--c4k-teal, #0E7490);
+          color: #fff;
+        }
+        .pagination .page-item.disabled .page-link {
+          color: var(--c4k-gray-400, #9CA3AF);
+          background-color: #fff;
+          border-color: var(--c4k-gray-200, #E5E7EB);
+          opacity: 0.5;
         }
         .message-preview {
           max-width: 280px;
@@ -393,7 +416,7 @@ function ContactDetail({ contact, onClose, onRefresh }) {
 
 function AdminContactPage() {
   const { user } = useAuth();
-  const canAccessAdmin = user?.role === 'Admin' || user?.role === 'SuperAdmin';
+  const canAccessAdmin = user?.role === 'Admin';
 
   const [contacts, setContacts] = useState([]);
   const [stats, setStats] = useState(null);
@@ -413,10 +436,9 @@ function AdminContactPage() {
       if (isReadFilter !== '') params.isRead = isReadFilter === 'read';
       if (search.trim()) params.search = search.trim();
       const response = await contactService.getAll(params);
-      if (response.data?.success) {
-        setContacts(response.data.data || []);
-        setTotal(response.data.pagination?.total || 0);
-      }
+      // response is { items, page, pageSize, totalCount }
+      setContacts(response?.items || []);
+      setTotal(response?.totalCount ?? response?.total ?? 0);
     } catch (err) {
       setError('Failed to load contact submissions.');
     } finally {
@@ -427,7 +449,7 @@ function AdminContactPage() {
   const fetchStats = useCallback(async () => {
     try {
       const response = await contactService.getStats();
-      if (response.data?.success) setStats(response.data.data);
+      if (response) setStats(response);
     } catch (err) { /* non-fatal */ }
   }, []);
 
@@ -441,7 +463,7 @@ function AdminContactPage() {
   const handleSelect = async (c) => {
     try {
       const response = await contactService.getById(c.contactId);
-      if (response.data?.success) setSelectedContact(response.data.data);
+      if (response) setSelectedContact(response);
     } catch (err) {
       setError('Failed to load contact details.');
     }

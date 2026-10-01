@@ -50,8 +50,11 @@ public static class InfrastructureServiceCollectionExtensions
         // Atomic operations service (C-04 fix)
         services.AddScoped<IAtomicCampaignUpdater, AtomicCampaignUpdater>();
 
-        // Transaction factory for atomic operations (C-04.2)
+        // Transaction factory + execution strategy (Phase 1 fix).
+        // Together they ensure SaveChangesAsync and raw SQL UPDATEs share one transaction
+        // and that the transaction runs under the configured retry policy.
         services.AddScoped<IDbTransactionFactory, DbTransactionFactory>();
+        services.AddScoped<IDbExecutionStrategy, EfDbExecutionStrategy>();
 
         // JWT Settings
         // Note: Jwt:Secret is validated in Program.cs. Here we use the configured value.

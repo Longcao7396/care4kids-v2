@@ -9,7 +9,7 @@ import './AdminLayout.css';
  *   Sidebar  + topbar + content area.
  *   Wraps every /admin/* route. Role guard is enforced
  *   by ProtectedRoute; this component assumes the user
- *   is already Admin / SuperAdmin.
+ *   is already Admin.
  * ───────────────────────────────────────────────── */
 
 const NAV_GROUPS = [
@@ -45,7 +45,6 @@ const NAV_GROUPS = [
       { to: '/admin/gallery', label: 'Gallery', icon: 'gallery' },
       { to: '/admin/achievements', label: 'Achievements', icon: 'trophy' },
       { to: '/admin/cms', label: 'CMS Pages', icon: 'cms' },
-      { to: '/admin/about', label: 'Site Settings', icon: 'settings' },
     ],
   },
   {
@@ -137,13 +136,6 @@ const Icon = ({ name }) => {
           <line x1="9" y1="17" x2="15" y2="17"/>
         </svg>
       );
-    case 'settings':
-      return (
-        <svg {...common}>
-          <circle cx="12" cy="12" r="3"/>
-          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09A1.65 1.65 0 0 0 15 4.6a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.36.6.86 1.07 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-        </svg>
-      );
     case 'queries':
       return (
         <svg {...common}>
@@ -212,8 +204,6 @@ function AdminLayout() {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const isSuperAdmin = user?.role === 'SuperAdmin';
-
   /* Close mobile sidebar on route change */
   useEffect(() => {
     setSidebarOpen(false);
@@ -252,15 +242,12 @@ function AdminLayout() {
       {/* ═══ SIDEBAR ═══ */}
       <aside className="al-sidebar" aria-label="Admin navigation">
         <div className="al-brand">
-          <div className="al-brand-mark" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-            </svg>
-          </div>
-          <div className="al-brand-text">
-            <span className="al-brand-name">Care4Kids</span>
-            <span className="al-brand-role">Admin Console</span>
-          </div>
+          <img 
+            src="/images/branding/Care4Kids_logo_clean.svg" 
+            alt="Care4Kids" 
+            className="al-brand-logo"
+          />
+          <span className="al-brand-role">Admin Console</span>
         </div>
 
         <nav className="al-nav" aria-label="Admin sections">
@@ -345,7 +332,6 @@ function AdminLayout() {
                 <div className="al-user-menu-head">
                   <span className="al-user-name">{user?.fullName || user?.username}</span>
                   <span className="al-user-email">{user?.email}</span>
-                  {isSuperAdmin && <span className="al-user-badge">Super Admin</span>}
                 </div>
                 <Dropdown.Divider />
                 <Dropdown.Item onClick={handleExitAdmin}>View public site</Dropdown.Item>

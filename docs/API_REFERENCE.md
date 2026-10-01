@@ -30,9 +30,9 @@ Every response uses the same envelope:
 Create a new user account (default role: `User`).
 ```json
 // Request
-{ "email": "user@example.com", "password": "P@ssword1", "fullName": "Jane Doe" }
+{ "email": "newuser@example.com", "password": "P@ssword1", "fullName": "Jane Doe" }
 // 201 Created
-{ "success": true, "data": { "userId": 12, "email": "user@example.com" } }
+{ "success": true, "data": { "userId": 12, "email": "newuser@example.com" } }
 ```
 
 ### `POST /auth/login`

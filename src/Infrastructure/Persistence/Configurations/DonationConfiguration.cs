@@ -42,6 +42,7 @@ public class DonationConfiguration : IEntityTypeConfiguration<Donation>
             .HasMaxLength(100);
 
         // Relationships - UserId is optional to support anonymous donations
+        builder.Property(d => d.UserId).IsRequired(false);
         builder.HasOne(d => d.User)
             .WithMany(u => u.Donations)
             .HasForeignKey(d => d.UserId)

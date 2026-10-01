@@ -1,4 +1,3 @@
-using System.Data.Common;
 using FluentAssertions;
 using FluentValidation;
 using FluentValidation.Results;
@@ -7,6 +6,7 @@ using GiveAID.Application.Features.Donations.Commands.Create;
 using GiveAID.Application.Features.Donations.DTOs;
 using GiveAID.Application.Services;
 using GiveAID.Domain.Entities;
+using GiveAID.Tests.Unit.Application.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using MockQueryable.Moq;
@@ -19,52 +19,26 @@ public class CreateDonationHandlerTests
     private readonly Mock<IApplicationDbContext> _contextMock;
     private readonly Mock<IPaymentGateway> _paymentGatewayMock;
     private readonly Mock<IValidator<CreateDonationCommand>> _validatorMock;
-    private readonly Mock<IAtomicCampaignUpdater> _atomicCampaignUpdaterMock;
     private readonly Mock<IDbTransactionFactory> _dbTransactionFactoryMock;
-
-    // Tracks calls to atomic updater for verification
-    private readonly List<(int CampaignId, decimal Amount, DbConnection Conn, DbTransaction Trans)> _atomicCalls;
+    private readonly TestDbExecutionStrategy _executionStrategy;
 
     public CreateDonationHandlerTests()
     {
         _contextMock = new Mock<IApplicationDbContext>();
         _paymentGatewayMock = new Mock<IPaymentGateway>();
         _validatorMock = new Mock<IValidator<CreateDonationCommand>>();
-        _atomicCampaignUpdaterMock = new Mock<IAtomicCampaignUpdater>();
         _dbTransactionFactoryMock = new Mock<IDbTransactionFactory>();
+        _executionStrategy = new TestDbExecutionStrategy();
 
         // By default, validator passes
         _validatorMock
             .Setup(v => v.ValidateAsync(It.IsAny<CreateDonationCommand>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ValidationResult());
 
-        _atomicCalls = new List<(int, decimal, DbConnection, DbTransaction)>();
-
-        // C-04.1: Mock IAtomicCampaignUpdater to capture calls WITHOUT executing real code.
-        // This avoids the non-overridable DbConnection.CreateCommand() issue in Moq.
-        _atomicCampaignUpdaterMock
-            .Setup(u => u.IncrementRaisedAmountAsync(
-                It.IsAny<int>(), It.IsAny<decimal>(),
-                It.IsAny<DbConnection>(), It.IsAny<DbTransaction>(),
-                It.IsAny<CancellationToken>()))
-            .Callback<int, decimal, DbConnection, DbTransaction, CancellationToken>(
-                (cid, amt, conn, trans, ct) => _atomicCalls.Add((cid, amt, conn, trans)))
-            .Returns(Task.CompletedTask);
-
-        // C-04.2: Mock IDbTransactionFactory to return mock connection/transaction.
-        // We use Mock.Of<> for DbConnection/DbTransaction since their non-virtual methods
-        // (CreateCommand, Connection property) can't be mocked — but we don't need them
-        // because IAtomicCampaignUpdater is also mocked and never calls CreateCommand().
-        var mockConnection = new Mock<DbConnection>();
-        mockConnection.Setup(c => c.State).Returns(System.Data.ConnectionState.Open);
-
-        var mockTransaction = new Mock<DbTransaction>();
-        mockTransaction.Setup(t => t.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
-        mockTransaction.Setup(t => t.RollbackAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
-
+        // Phase 1: IDbTransactionFactory returns an IAppTransactionScope (no DbConnection/DbTransaction leakage).
         _dbTransactionFactoryMock
             .Setup(f => f.BeginTransactionAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync((mockConnection.Object, mockTransaction.Object));
+            .ReturnsAsync(() => new TestAppTransactionScope());
 
         // Set up Campaigns DbSet — non-expired, Active campaign for tests that pass CampaignId
         var campaigns = new List<Campaign>
@@ -78,6 +52,22 @@ public class CreateDonationHandlerTests
             .ReturnsAsync((object[] ids, CancellationToken ct) =>
                 campaigns.FirstOrDefault(c => c.CampaignId == Convert.ToInt32(ids[0])));
         _contextMock.Setup(c => c.Campaigns).Returns(mockCampaignSet.Object);
+
+        // Set up Causes DbSet — a default active cause (ID=1) is returned for any
+        // causeId lookup. Tests that need to assert a specific cause state
+        // (inactive / not-found / a different active cause) override this
+        // setup with their own DbSet mock.
+        var defaultCauses = new List<Cause>
+        {
+            new Cause { CauseId = 1, CauseName = "Education for Children", IsActive = true },
+            new Cause { CauseId = 2, CauseName = "Healthcare Support",     IsActive = true },
+            new Cause { CauseId = 3, CauseName = "Child Welfare",          IsActive = true }
+        }.AsQueryable();
+        var mockCauseSet = defaultCauses.BuildMockDbSet();
+        mockCauseSet.Setup(s => s.FindAsync(It.IsAny<object[]>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((object[] ids, CancellationToken ct) =>
+                defaultCauses.FirstOrDefault(c => c.CauseId == Convert.ToInt32(ids[0])));
+        _contextMock.Setup(c => c.Causes).Returns(mockCauseSet.Object);
     }
 
     // ---- Basic handler tests ----
@@ -164,58 +154,29 @@ public class CreateDonationHandlerTests
             10000, "usd", 0, "donor@example.com"), Times.Once);
     }
 
-    // ---- C-04.2: Transaction boundary tests ----
+    // ---- C-04.2: Transaction boundary test ----
+    // Verify the donation insert still participates in a transaction (the atomic
+    // aggregate update is no longer part of this handler — it happens later in the
+    // confirm handlers, but the donation INSERT itself is still transactional).
 
     [Fact]
-    public async Task Handle_WithCampaign_CallsAtomicCampaignUpdaterWithCorrectParams()
+    public async Task Handle_StillOpensTransactionForDonationInsert()
     {
-        // Arrange
-        _atomicCalls.Clear();
-        var mockDonationSet = new Mock<DbSet<Donation>>();
-        mockDonationSet.Setup(s => s.Add(It.IsAny<Donation>()));
-        _contextMock.Setup(c => c.Donations).Returns(mockDonationSet.Object);
-        _contextMock.Setup(c => c.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
-
-        var handler = MakeHandler();
-        var command = new CreateDonationCommand
-        {
-            UserId = 1, CauseId = 1, CampaignId = 5,
-            Amount = 100m, PaymentMethod = "bank_transfer"
-        };
-
-        // Act
-        await handler.Handle(command, CancellationToken.None);
-
-        // Assert (C-04.1): AtomicCampaignUpdater was called with correct campaignId and amount
-        _atomicCalls.Should().ContainSingle();
-        var call = _atomicCalls[0];
-        call.CampaignId.Should().Be(5);
-        call.Amount.Should().Be(100m);
-    }
-
-    [Fact]
-    public async Task Handle_WithCampaign_UsesSameTransactionForBothOperations()
-    {
-        // Arrange — verify that the same DbTransaction is passed to atomic updater as was created
-        _atomicCalls.Clear();
-        var mockDonationSet = new Mock<DbSet<Donation>>();
-        mockDonationSet.Setup(s => s.Add(It.IsAny<Donation>()));
-        _contextMock.Setup(c => c.Donations).Returns(mockDonationSet.Object);
-        _contextMock.Setup(c => c.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
-
-        DbTransaction? capturedTransaction = null;
+        // Arrange — capture the scope returned by the factory so we can assert
+        // it was committed.
+        TestAppTransactionScope? capturedScope = null;
         _dbTransactionFactoryMock
             .Setup(f => f.BeginTransactionAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(() =>
             {
-                var conn = new Mock<DbConnection>();
-                conn.Setup(c => c.State).Returns(System.Data.ConnectionState.Open);
-                var trans = new Mock<DbTransaction>();
-                trans.Setup(t => t.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
-                trans.Setup(t => t.RollbackAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
-                capturedTransaction = trans.Object;
-                return (conn.Object, trans.Object);
+                capturedScope = new TestAppTransactionScope();
+                return capturedScope;
             });
+
+        var mockDonationSet = new Mock<DbSet<Donation>>();
+        mockDonationSet.Setup(s => s.Add(It.IsAny<Donation>()));
+        _contextMock.Setup(c => c.Donations).Returns(mockDonationSet.Object);
+        _contextMock.Setup(c => c.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
         var handler = MakeHandler();
         var command = new CreateDonationCommand
@@ -227,40 +188,42 @@ public class CreateDonationHandlerTests
         // Act
         await handler.Handle(command, CancellationToken.None);
 
-        // Assert (C-04.2): The transaction passed to atomic updater is the same one from the factory
-        _atomicCalls.Should().ContainSingle();
-        _atomicCalls[0].Trans.Should().BeSameAs(capturedTransaction);
+        // Assert: transaction scope was opened, committed, and disposed
+        capturedScope.Should().NotBeNull("the donation insert must still be wrapped in a transaction");
+        capturedScope!.CommitCalls.Should().Be(1);
+        capturedScope.RollbackCalls.Should().Be(0);
+        capturedScope.DisposeCalls.Should().Be(1);
     }
 
+    // Phase 1 rollback test: inject a failure during the SaveChangesAsync call so
+    // the transaction MUST roll back. This is the key acceptance criterion for the
+    // Phase 1 fix (one transaction covers SaveChangesAsync AND raw SQL UPDATEs).
     [Fact]
-    public async Task Handle_WithoutCampaign_DoesNotCallAtomicCampaignUpdater()
+    public async Task Handle_WhenSaveChangesFails_TransactionIsRolledBack()
     {
-        // Arrange
-        _atomicCalls.Clear();
+        // Arrange: SaveChangesAsync throws AFTER the IAppTransactionScope has been opened.
+        _contextMock
+            .Setup(c => c.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("Simulated DB failure"));
+
         var mockDonationSet = new Mock<DbSet<Donation>>();
         mockDonationSet.Setup(s => s.Add(It.IsAny<Donation>()));
         _contextMock.Setup(c => c.Donations).Returns(mockDonationSet.Object);
-        _contextMock.Setup(c => c.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
         var handler = MakeHandler();
         var command = new CreateDonationCommand
         {
-            CauseId = 1, Amount = 25m,
-            CampaignId = null, // No campaign
-            PaymentMethod = "bank_transfer"
+            UserId = 1, CauseId = 1, CampaignId = 3,
+            Amount = 50m, PaymentMethod = "bank_transfer"
         };
 
-        // Act
-        await handler.Handle(command, CancellationToken.None);
+        // Act + Assert: the exception propagates
+        var act = async () => await handler.Handle(command, CancellationToken.None);
+        await act.Should().ThrowAsync<InvalidOperationException>();
 
-        // Assert: AtomicCampaignUpdater was NOT called (no campaign)
-        _atomicCalls.Should().BeEmpty();
-        _atomicCampaignUpdaterMock.Verify(
-            u => u.IncrementRaisedAmountAsync(
-                It.IsAny<int>(), It.IsAny<decimal>(),
-                It.IsAny<DbConnection>(), It.IsAny<DbTransaction>(),
-                It.IsAny<CancellationToken>()),
-            Times.Never);
+        // Verify the transaction scope was rolled back (not committed).
+        _dbTransactionFactoryMock.Verify(
+            f => f.BeginTransactionAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
     // ---- H-01: Amount validation tests ----
@@ -454,18 +417,174 @@ public class CreateDonationHandlerTests
     // End M-13 Tests
     // ========================================================================
 
+    // ========================================================================
+    // Cause validation tests
+    // ========================================================================
+    // The Donation page UI hides inactive causes from the dropdown, but the
+    // backend must enforce the same business rule independently. These tests
+    // pin the contract:
+    //   * Active Cause  → donation is accepted
+    //   * Inactive Cause → donation is rejected with a ValidationException
+    //                       that mentions the cause ID (no code-name whitelist)
+    //   * Nonexistent Cause → donation is rejected with a ValidationException
+    //                          that mentions the cause ID
+    //
+    // No cause-code prefix is hard-coded in the handler — the rule is purely
+    // a function of the IsActive flag in the causes table.
+    // ========================================================================
+
+    [Fact]
+    public async Task Handle_ActiveCause_DonationIsAccepted()
+    {
+        // Arrange — default constructor setup already provides Cause 1 (active).
+        Donation? capturedDonation = null;
+        var mockDonationSet = new Mock<DbSet<Donation>>();
+        mockDonationSet.Setup(s => s.Add(It.IsAny<Donation>()))
+            .Callback<Donation>(d => capturedDonation = d);
+        _contextMock.Setup(c => c.Donations).Returns(mockDonationSet.Object);
+        _contextMock.Setup(c => c.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+
+        var handler = MakeHandler();
+
+        // Act — CauseId 1 is active in the default setup
+        await handler.Handle(new CreateDonationCommand
+        {
+            UserId = 1,
+            CauseId = 1,
+            Amount = 100m,
+            PaymentMethod = "bank_transfer"
+        }, CancellationToken.None);
+
+        // Assert — donation captured = accepted
+        capturedDonation.Should().NotBeNull();
+        capturedDonation!.CauseId.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Handle_InactiveCause_ThrowsValidationException()
+    {
+        // Arrange — replace the Causes mock so Cause 1 is INACTIVE
+        // (simulates an admin deactivating a cause after the test was written).
+        var inactiveCauses = new List<Cause>
+        {
+            new Cause { CauseId = 1, CauseName = "Education for Children", IsActive = false }
+        }.AsQueryable();
+        var mockCauseSet = inactiveCauses.BuildMockDbSet();
+        mockCauseSet.Setup(s => s.FindAsync(It.IsAny<object[]>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((object[] ids, CancellationToken ct) =>
+                inactiveCauses.FirstOrDefault(c => c.CauseId == Convert.ToInt32(ids[0])));
+        _contextMock.Setup(c => c.Causes).Returns(mockCauseSet.Object);
+
+        // The Donations Add / SaveChanges should NOT be invoked when cause is inactive.
+        var mockDonationSet = new Mock<DbSet<Donation>>(MockBehavior.Strict);
+        _contextMock.Setup(c => c.Donations).Returns(mockDonationSet.Object);
+
+        var handler = MakeHandler();
+
+        // Act + Assert — handler must throw a ValidationException. The message
+        // must reference the cause ID (no hard-coded whitelist, just the causeId).
+        var act = async () => await handler.Handle(new CreateDonationCommand
+        {
+            UserId = 1,
+            CauseId = 1,
+            Amount = 100m,
+            PaymentMethod = "bank_transfer"
+        }, CancellationToken.None);
+
+        var ex = (await act.Should().ThrowAsync<ValidationException>()
+            .WithMessage("*Cause with ID 1*not currently accepting donations*")).Which;
+        ex.Message.Should().NotContain("EDU",
+            "the handler must not hard-code cause codes");
+
+        // No donation row should be added.
+        mockDonationSet.Verify(
+            s => s.Add(It.IsAny<Donation>()),
+            Times.Never,
+            "an inactive cause must NOT result in a donation being added");
+    }
+
+    [Fact]
+    public async Task Handle_NonexistentCause_ThrowsValidationException()
+    {
+        // Arrange — Causes DbSet returns null (cause ID 999 doesn't exist).
+        // This simulates both a hand-crafted request with a bad id AND a
+        // soft-deleted cause (the EF global query filter `!IsDeleted`
+        // excludes those rows from FindAsync, so they look identical here).
+        var emptyCauses = new List<Cause>().AsQueryable();
+        var mockCauseSet = emptyCauses.BuildMockDbSet();
+        mockCauseSet.Setup(s => s.FindAsync(It.IsAny<object[]>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Cause?)null);
+        _contextMock.Setup(c => c.Causes).Returns(mockCauseSet.Object);
+
+        var mockDonationSet = new Mock<DbSet<Donation>>(MockBehavior.Strict);
+        _contextMock.Setup(c => c.Donations).Returns(mockDonationSet.Object);
+
+        var handler = MakeHandler();
+
+        // Act + Assert — handler must throw ValidationException; donation not added.
+        var act = async () => await handler.Handle(new CreateDonationCommand
+        {
+            UserId = 1,
+            CauseId = 999,
+            Amount = 100m,
+            PaymentMethod = "bank_transfer"
+        }, CancellationToken.None);
+
+        await act.Should().ThrowAsync<ValidationException>()
+            .WithMessage("*Cause with ID 999*was not found*");
+
+        mockDonationSet.Verify(
+            s => s.Add(It.IsAny<Donation>()),
+            Times.Never,
+            "a non-existent cause must NOT result in a donation being added");
+    }
+
+    [Fact]
+    public async Task Handle_InactiveCause_AnonymousDonationAlsoRejected()
+    {
+        // Arrange — same inactive cause, but UserId is null (anonymous donor).
+        // The cause validation must run BEFORE user resolution, so anonymous
+        // donations are held to the same standard.
+        var inactiveCauses = new List<Cause>
+        {
+            new Cause { CauseId = 7, CauseName = "Deactivated Cause", IsActive = false }
+        }.AsQueryable();
+        var mockCauseSet = inactiveCauses.BuildMockDbSet();
+        mockCauseSet.Setup(s => s.FindAsync(It.IsAny<object[]>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((object[] ids, CancellationToken ct) =>
+                inactiveCauses.FirstOrDefault(c => c.CauseId == Convert.ToInt32(ids[0])));
+        _contextMock.Setup(c => c.Causes).Returns(mockCauseSet.Object);
+
+        var mockDonationSet = new Mock<DbSet<Donation>>(MockBehavior.Strict);
+        _contextMock.Setup(c => c.Donations).Returns(mockDonationSet.Object);
+
+        var handler = MakeHandler();
+
+        var act = async () => await handler.Handle(new CreateDonationCommand
+        {
+            UserId = null, // anonymous
+            CauseId = 7,
+            Amount = 50m,
+            PaymentMethod = "bank_transfer",
+            Email = "anon@example.com"
+        }, CancellationToken.None);
+
+        await act.Should().ThrowAsync<ValidationException>()
+            .WithMessage("*Cause with ID 7*not currently accepting donations*");
+    }
+
     // ---- Test helper ----
 
     private CreateDonationCommandHandler MakeHandler()
     {
         var loggerMock = new Mock<ILogger<CreateDonationCommandHandler>>();
-        
+
         return new CreateDonationCommandHandler(
             _contextMock.Object,
             _paymentGatewayMock.Object,
             _validatorMock.Object,
-            _atomicCampaignUpdaterMock.Object,
             _dbTransactionFactoryMock.Object,
+            _executionStrategy,
             loggerMock.Object);
     }
 }

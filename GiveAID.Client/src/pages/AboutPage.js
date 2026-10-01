@@ -152,9 +152,10 @@ const TIMELINE = [
 
 const LEADERS = [
   { name: 'Cao Hai Long', role: 'Founder & Executive Director', initials: 'CHL', color: '#E87A5A' },
-  { name: 'Nguyen Sy Son', role: 'Director of Programmes', initials: 'NSS', color: '#0E7490' },
+  { name: 'Dinh Sy Son', role: 'Director of Programmes', initials: 'DSS', color: '#0E7490' },
   { name: 'Bui Manh Duy', role: 'Head of Partnerships', initials: 'BMD', color: '#5B8C3D' },
   { name: 'Le Ho Hoang Hai', role: 'Director of Operations', initials: 'LHH', color: '#7C3AED' },
+  { name: 'Nguyen Nhat Long', role: 'Director of Operations', initials: 'NNL', color: '#D97706' },
 ];
 
 function AboutPage() {
@@ -169,11 +170,10 @@ function AboutPage() {
       // Bulk-load all editable sections in one call.
       const keys = EDITABLE_SECTIONS.join(',');
       const res = await api.get('/cms/pages', { params: { keys } });
-      if (res.data?.success && Array.isArray(res.data.data)) {
-        const map = {};
-        res.data.data.forEach((p) => { map[p.pageKey] = p; });
-        setCmsPages(map);
-      }
+      const list = Array.isArray(res) ? res : (res?.items || []);
+      const map = {};
+      list.forEach((p) => { map[p.pageKey] = p; });
+      setCmsPages(map);
     } catch (err) {
       console.warn('About CMS fallback:', err);
     }

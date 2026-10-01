@@ -40,7 +40,8 @@ The solution targets `net10.0`. The build will fail on .NET 8 SDKs.
 ### 2.1 Build
 
 ```powershell
-cd "C:\Users\admin\Desktop\project NGO.v2"
+# Run from the repo root (where GiveAID.V2.slnx lives).
+cd "<REPO_ROOT>"
 dotnet restore GiveAID.V2.slnx
 dotnet build  src\WebApi\GiveAID.V2.WebApi.csproj -c Release --nologo
 ```
@@ -288,7 +289,8 @@ A self-contained smoke test is in `scripts/Test-Cors.ps1`. It:
 Run it:
 
 ```powershell
-cd "C:\Users\admin\Desktop\project NGO.v2"
+# Run from the repo root.
+cd "<REPO_ROOT>"
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\Test-Cors.ps1
 ```
 

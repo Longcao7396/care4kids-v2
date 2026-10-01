@@ -62,6 +62,26 @@ function validateCvv(cvv, isAmex) {
   return digits.length >= 3 && digits.length <= 4;
 }
 
+/**
+ * Deduplicate an array by `causeId` (or `campaignId`/`id`) — keep
+ * the first occurrence. Protects against repeated responses from
+ * cached interceptors / retries / accidentally duplicated DB rows.
+ */
+function dedupeById(arr) {
+  if (!Array.isArray(arr)) return [];
+  const seen = new Set();
+  const out = [];
+  for (const item of arr) {
+    if (!item || typeof item !== 'object') continue;
+    const id = item.causeId ?? item.campaignId ?? item.id;
+    if (id == null) continue;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    out.push(item);
+  }
+  return out;
+}
+
 /* ============================================================
 // DonatePage
 // ============================================================ */
@@ -75,6 +95,7 @@ const DonatePage = () => {
   const [campaigns, setCampaigns] = useState([]);
   const [subCauses, setSubCauses] = useState([]);
   const [treeLoading, setTreeLoading] = useState(true);
+  const [treeError, setTreeError] = useState('');  // NEW: surface API failure to user
   const [formData, setFormData] = useState({
     causeId: location.state?.causeId != null ? String(location.state.causeId) : '',
     campaignId: location.state?.campaignId != null ? String(location.state.campaignId) : '',
@@ -93,6 +114,26 @@ const DonatePage = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  // ─────────────────────────────────────────────────────────────
+  // Cause source-of-truth.
+//
+// The Donation page dropdown is populated from the SAME
+// GET /api/v1/causes/tree endpoint used by CampaignsPage and the
+// public /campaigns page. That endpoint already filters
+// IsActive = true on the server, so any cause that appears in the
+// response has been promoted by the same admin tooling that powers
+// the rest of the site. The frontend MUST NOT maintain its own
+// whitelist of cause codes — that would create a second source of
+// truth and risk hiding legitimate future causes.
+//
+// The only client-side filtering we apply here is purely defensive:
+//   1) skip null / malformed entries,
+//   2) honour IsActive (belt-and-suspenders in case the response
+//      ever contains an inactive cause for any reason),
+//   3) deduplicate by id so a cached/repeated response cannot show
+//      two of the same cause.
+// ─────────────────────────────────────────────────────────────
 
   // Card brand auto-detection
   const cardBrand = useMemo(() => getCardBrand(formData.cardNumber), [formData.cardNumber]);
@@ -160,18 +201,50 @@ const DonatePage = () => {
         // No `parent` wrapper — `causeId` lives at the element root.
         const rawTree = Array.isArray(treeResp) ? treeResp : [];
         const safeTree = rawTree.filter((n) => n && typeof n === 'object');
-        setCauseTree(safeTree);
+
+        // Defensive client-side filter: keep entries that look like
+        // a cause with a positive id, honour IsActive if the field is
+        // present (the API already filters activeOnly=true), and drop
+        // anything that fails these checks. We do NOT maintain a second
+        // cause-code whitelist here — the backend IsActive flag is the
+        // single source of truth for what should be shown to donors.
+        const filteredTree = safeTree
+          .filter((node) => node && node.causeId != null && node.isActive !== false)
+          .map((node) => ({
+            ...node,
+            // Same defensive treatment for sub-causes.
+            subCauses: Array.isArray(node.subCauses)
+              ? node.subCauses.filter((s) =>
+                  s && typeof s === 'object' && s.causeId != null && s.isActive !== false
+                )
+              : []
+          }));
+
+        // Deduplicate by causeId (defensive against cached/repeated responses).
+        const dedupedTree = dedupeById(filteredTree);
+
+        setCauseTree(dedupedTree);
+
         // Build flat list: parent + all its sub-causes, dropping null/invalid entries.
         const flat = [];
-        safeTree.forEach((node) => {
+        dedupedTree.forEach((node) => {
           if (node.causeId != null) flat.push(node);
           (Array.isArray(node.subCauses) ? node.subCauses : []).forEach((s) => {
             if (s && typeof s === 'object' && s.causeId != null) flat.push(s);
           });
         });
         setCauses(flat);
+        // If we successfully received an empty list, surface that to the user.
+        if (dedupedTree.length === 0) {
+          setTreeError('No donation causes are currently available. Please check back later.');
+        } else {
+          setTreeError('');
+        }
       } catch (e) {
-        if (e.name !== 'CanceledError') console.error('[DonatePage] Failed to load causes tree:', e);
+        if (e.name !== 'CanceledError') {
+          console.error('[DonatePage] Failed to load causes tree:', e);
+          setTreeError('Could not load donation causes right now. Please refresh the page or try again shortly.');
+        }
       } finally {
         if (!ac.signal.aborted) setTreeLoading(false);
       }
@@ -185,9 +258,11 @@ const DonatePage = () => {
         const items = Array.isArray(r?.items) ? r.items
                     : Array.isArray(r) ? r
                     : [];
-        // Defensive: filter out entries missing required fields.
-        const safeItems = items.filter((c) => c && typeof c === 'object' && c.campaignId != null);
-        setCampaigns(safeItems);
+        // Defensive: filter out entries missing required fields and dedupe.
+        const safeItems = items
+          .filter((c) => c && typeof c === 'object' && c.campaignId != null)
+          .filter((c) => c.status === 'Active');
+        setCampaigns(dedupeById(safeItems));
       } catch (e) {
         if (e.name !== 'CanceledError') console.error('Failed to load campaigns:', e);
       }
@@ -240,7 +315,10 @@ const DonatePage = () => {
     try {
       const r = await api.get('/campaigns', { params: { status: 'Active', causeId } });
       const items = r?.items || (Array.isArray(r) ? r : []);
-      setCampaigns(items);
+      const safeItems = items
+        .filter((c) => c && typeof c === 'object' && c.campaignId != null)
+        .filter((c) => c.status === 'Active');
+      setCampaigns(dedupeById(safeItems));
     } catch (e) { console.error(e); }
   };
 
@@ -262,6 +340,21 @@ const DonatePage = () => {
     if (!formData.causeId) { setError('Please select a cause to support.'); return; }
     if (!formData.amount || parseFloat(formData.amount) <= 0) { setError('Please enter a valid donation amount.'); return; }
 
+    // Defensive: ensure the selected cause is still in the loaded tree.
+    // Guards against a stale form value pointing at a cause that has
+    // since been deactivated or removed on the server.
+    const selectedNumId = Number(formData.causeId);
+    const stillExists = (causeTree || []).some(
+      (n) => n && (
+        n.causeId === selectedNumId ||
+        (Array.isArray(n.subCauses) && n.subCauses.some((s) => s && s.causeId === selectedNumId))
+      )
+    );
+    if (!stillExists) {
+      setError('The selected cause is no longer available. Please pick another.');
+      return;
+    }
+
     const errs = validateCardFields();
     if (Object.keys(errs).length > 0) { setCardErrors(errs); setError('Please correct the payment details below.'); return; }
 
@@ -277,11 +370,9 @@ const DonatePage = () => {
         isAnonymous: formData.isAnonymous,
         idempotencyKey
       };
-      const response = await donationsService.create(donationData);
-      if (response.success) {
-        setSuccess('Thank you for your generous donation. You will receive a receipt via email.');
-        setTimeout(() => navigate('/my-donations'), 2000);
-      }
+      await donationsService.create(donationData);
+      setSuccess('Thank you for your generous donation. You will receive a receipt via email.');
+      setTimeout(() => navigate('/my-donations'), 2000);
     } catch (err) {
       setError(err.response?.data?.message || err.message || 'Donation failed. Please try again.');
     } finally {
@@ -339,11 +430,15 @@ const DonatePage = () => {
                     <p className="dp-step-num">Step 1</p>
                     <h3 className="dp-step-title">Choose a Cause</h3>
                     <p className="dp-step-desc">Select the area you'd like your donation to support.</p>
-                    <Form.Select
-                      name="parentCauseId"
-                      disabled={treeLoading}
-                      value={
-                        (() => {
+                    {treeError && causeTree.length === 0 ? (
+                      <Alert variant="warning" className="dp-alert" data-testid="cause-load-error">
+                        {treeError}
+                      </Alert>
+                    ) : (
+                      <Form.Select
+                        name="parentCauseId"
+                        disabled={treeLoading || causeTree.length === 0}
+                        value={(() => {
                           const selectedId = formData.causeId;
                           if (selectedId === '' || selectedId === null || selectedId === undefined) return '';
                           const numId = Number(selectedId);
@@ -355,36 +450,42 @@ const DonatePage = () => {
                             )
                           );
                           return found?.causeId != null ? String(found.causeId) : '';
-                        })()
-                      }
-                      onChange={(e) => {
-                        const raw = e.target.value;
-                        const parentId = Number(raw);
-                        if (!raw || !Number.isFinite(parentId) || parentId === 0) {
-                          setFormData((p) => ({ ...p, causeId: '', campaignId: '' }));
-                          return;
-                        }
-                        const parent = (causeTree || []).find(
-                          (n) => n && n.causeId === parentId
-                        );
-                        setFormData((p) => ({
-                          ...p,
-                          causeId: parent?.causeId != null ? String(parent.causeId) : '',
-                          campaignId: ''
-                        }));
-                      }}
-                      required
-                      className="dp-select"
-                    >
-                      <option value="">{treeLoading ? 'Loading causes…' : 'Choose a cause...'}</option>
-                      {(causeTree || [])
-                        .filter((n) => n && n.causeId != null)
-                        .map((node) => (
-                          <option key={node.causeId} value={node.causeId}>
-                            {node.causeName}
-                          </option>
-                        ))}
-                    </Form.Select>
+                        })()}
+                        onChange={(e) => {
+                          const raw = e.target.value;
+                          const parentId = Number(raw);
+                          if (!raw || !Number.isFinite(parentId) || parentId === 0) {
+                            setFormData((p) => ({ ...p, causeId: '', campaignId: '' }));
+                            return;
+                          }
+                          const parent = (causeTree || []).find(
+                            (n) => n && n.causeId === parentId
+                          );
+                          setFormData((p) => ({
+                            ...p,
+                            causeId: parent?.causeId != null ? String(parent.causeId) : '',
+                            campaignId: ''
+                          }));
+                        }}
+                        required
+                        className="dp-select"
+                      >
+                        <option value="">
+                          {treeLoading
+                            ? 'Loading causes…'
+                            : causeTree.length === 0
+                              ? 'No causes available'
+                              : 'Choose a cause…'}
+                        </option>
+                        {(causeTree || [])
+                          .filter((n) => n && n.causeId != null)
+                          .map((node) => (
+                            <option key={node.causeId} value={node.causeId}>
+                              {node.causeName}
+                            </option>
+                          ))}
+                      </Form.Select>
+                    )}
                   </div>
 
                   {/* Step 1b — Sub-cause */}

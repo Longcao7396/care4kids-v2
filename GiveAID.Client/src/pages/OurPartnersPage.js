@@ -267,11 +267,12 @@ function OurPartnersPage() {
       setLoading(true);
       const params = { activeOnly: true };
       if (type) params.type = type;
-      const response = await supportersService.getAll(params);
-      const apiItems = response?.success ? (response.data || []) : [];
+      // The API interceptor unwraps { success, message, data } envelopes,
+      // so `response` here is the underlying array — NOT the envelope.
+      const apiItems = await supportersService.getAll(params);
       // Fallback: if the API returns an empty list (e.g. backend not seeded
       // or unreachable), show local sample partners so the page is never empty.
-      setItems(apiItems.length > 0 ? apiItems : SAMPLE_ORGANIZATIONS);
+      setItems(Array.isArray(apiItems) && apiItems.length > 0 ? apiItems : SAMPLE_ORGANIZATIONS);
     } catch (err) {
       console.warn('Partners fetch failed, using sample data:', err);
       setItems(SAMPLE_ORGANIZATIONS);

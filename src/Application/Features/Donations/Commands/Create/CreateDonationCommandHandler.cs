@@ -30,30 +30,70 @@ public class CreateDonationCommandHandler : IRequestHandler<CreateDonationComman
     // M-02 NOTE: Validator is no longer used in handler - ValidationBehavior handles it
     // Keeping field for backward compatibility with unit tests
     private readonly IValidator<CreateDonationCommand> _validator;
-    private readonly IAtomicCampaignUpdater _atomicCampaignUpdater;
     private readonly IDbTransactionFactory _dbTransactionFactory;
+    private readonly IDbExecutionStrategy _executionStrategy;
     private readonly ILogger<CreateDonationCommandHandler> _logger;
 
     public CreateDonationCommandHandler(
         IApplicationDbContext context,
         IPaymentGateway paymentGateway,
         IValidator<CreateDonationCommand> validator,
-        IAtomicCampaignUpdater atomicCampaignUpdater,
         IDbTransactionFactory dbTransactionFactory,
+        IDbExecutionStrategy executionStrategy,
         ILogger<CreateDonationCommandHandler> logger)
     {
         _context = context;
         _paymentGateway = paymentGateway;
         _validator = validator; // Kept for unit test compatibility
-        _atomicCampaignUpdater = atomicCampaignUpdater;
         _dbTransactionFactory = dbTransactionFactory;
+        _executionStrategy = executionStrategy;
         _logger = logger;
     }
 
-    public async Task<DonationDto> Handle(CreateDonationCommand request, CancellationToken cancellationToken)
+    public Task<DonationDto> Handle(CreateDonationCommand request, CancellationToken cancellationToken)
+    {
+        // Phase 1: Wrap the transactional block in the retry execution strategy
+        // (required because EnableRetryOnFailure is on, otherwise EF throws on the
+        // user-initiated transaction).
+        return _executionStrategy.ExecuteAsync(async ct =>
+        {
+            return await HandleInternalAsync(request, ct);
+        }, cancellationToken);
+    }
+
+    private async Task<DonationDto> HandleInternalAsync(CreateDonationCommand request, CancellationToken cancellationToken)
     {
         // M-02 FIX: ValidationBehavior now handles this automatically in the pipeline
         // Removed manual validator.ValidateAsync() call to avoid double validation
+
+        // ── Cause validation ────────────────────────────────────────────
+        // The Cause table's IsActive flag is the SINGLE SOURCE OF TRUTH for
+        // which causes may receive donations. We do NOT maintain a hard-coded
+        // whitelist of cause codes here — admins can promote / demote any
+        // cause by toggling IsActive, and that change must immediately take
+        // effect at this layer too. The Donation page UI already hides
+        // inactive causes from the public dropdown, but this guard enforces
+        // the same business rule independently on the server so that:
+        //   * direct API consumers (mobile apps, scripts, internal tools)
+        //     cannot bypass the UI filter,
+        //   * historical donations referencing a cause that has since been
+        //     deactivated remain untouched (only NEW donations are rejected).
+        //
+        // The Cause global query filter excludes soft-deleted rows
+        // (`!c.IsDeleted`) — so a soft-deleted cause returns null here,
+        // which is treated the same as "not found".
+        var cause = await _context.Causes
+            .FindAsync(new object[] { request.CauseId }, cancellationToken);
+        if (cause == null)
+        {
+            throw new ValidationException(
+                $"Cause with ID {request.CauseId} was not found.");
+        }
+        if (!cause.IsActive)
+        {
+            throw new ValidationException(
+                $"Cause with ID {request.CauseId} is not currently accepting donations.");
+        }
 
         // L-05: Check if campaign exists and is not expired (if donating to a campaign)
         if (request.CampaignId.HasValue)
@@ -191,34 +231,32 @@ public class CreateDonationCommandHandler : IRequestHandler<CreateDonationComman
         // transaction so that either both commit or both rollback.
         // C-04.1: Campaign RaisedAmount is updated with atomic SQL to prevent lost updates
         //         under concurrent load.
-        // Use IDbTransactionFactory (defined in Application, implemented in Infrastructure) to create
-        // a shared transaction and connection. This keeps the architecture clean: Application layer
-        // defines the abstraction, Infrastructure layer knows about DbConnection/DbTransaction.
-        var (connection, transaction) = await _dbTransactionFactory.BeginTransactionAsync(cancellationToken);
+        // Use IDbTransactionFactory (defined in Application, implemented in Infrastructure) to start
+        // a transaction on the same scoped DbContext. Phase 1: this is now
+        // Database.BeginTransactionAsync() so SaveChangesAsync and any raw SQL UPDATEs share the
+        // same transaction automatically (EF auto-enlistment).
+        //
+        // Aggregate invariant (audit fix):
+        //   campaigns.raised_amount  = SUM(amount WHERE status='Completed')
+        //   causes.raised_amount     = SUM(amount WHERE status='Completed')
+        // Because the invariant counts ONLY Completed donations, a Pending donation must NOT
+        // contribute to the aggregates. Incrementing at creation time was double-counting once
+        // the webhook/manual confirm later incremented again on the Pending->Completed transition.
+        // The aggregates are now updated exclusively on a genuine Pending->Completed transition
+        // (in ConfirmWebhookCommandHandler / ManualConfirmCommandHandler).
+        await using var tx = await _dbTransactionFactory.BeginTransactionAsync(cancellationToken);
 
         try
         {
             _context.Donations.Add(donation);
             await _context.SaveChangesAsync(cancellationToken);
 
-            if (request.CampaignId.HasValue)
-            {
-                // Use the same connection/transaction — either both succeed or both rollback (C-04.2)
-                await _atomicCampaignUpdater.IncrementRaisedAmountAsync(
-                    request.CampaignId.Value, request.Amount, connection, transaction, cancellationToken);
-            }
-
-            await transaction.CommitAsync(cancellationToken);
+            await tx.CommitAsync(cancellationToken);
         }
         catch
         {
-            await transaction.RollbackAsync(cancellationToken);
+            await tx.RollbackAsync(cancellationToken);
             throw;
-        }
-        finally
-        {
-            await transaction.DisposeAsync();
-            await connection.DisposeAsync();
         }
 
         return MapToDto(donation);

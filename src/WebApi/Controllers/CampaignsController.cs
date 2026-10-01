@@ -37,7 +37,7 @@ public class CampaignsController : ControllerBase
     [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAll(
         [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 20,
+        [FromQuery] int pageSize = 12,
         [FromQuery] string? status = null,
         [FromQuery] int? causeId = null,
         [FromQuery] bool eventsOnly = false,

@@ -18,12 +18,7 @@ const MyDonationsPage = () => {
     try {
       setLoading(true);
       const response = await donationsService.getAll();
-      if (response.success) {
-        const list = Array.isArray(response.data)
-          ? response.data
-          : (response.data?.items || []);
-        setDonations(list);
-      }
+      setDonations(Array.isArray(response) ? response : (response?.items || []));
     } catch (error) {
       console.error('Error loading donations:', error);
     } finally {

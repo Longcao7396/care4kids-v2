@@ -22,6 +22,7 @@ public class RegisterCommandHandlerTests
     private readonly Mock<IPasswordHasher> _passwordHasherMock;
     private readonly Mock<IEmailSender> _emailSenderMock;
     private readonly Mock<ILogger<RegisterCommandHandler>> _loggerMock;
+    private readonly Mock<ICacheService> _cacheServiceMock;
 
     public RegisterCommandHandlerTests()
     {
@@ -29,9 +30,16 @@ public class RegisterCommandHandlerTests
         _passwordHasherMock = new Mock<IPasswordHasher>();
         _emailSenderMock = new Mock<IEmailSender>();
         _loggerMock = new Mock<ILogger<RegisterCommandHandler>>();
+        _cacheServiceMock = new Mock<ICacheService>();
 
         _passwordHasherMock.Setup(h => h.Hash(It.IsAny<string>())).Returns("hashed_password");
     }
+
+    private RegisterCommandHandler BuildHandler() =>
+        new(
+            _contextMock.Object, _passwordHasherMock.Object,
+            _emailSenderMock.Object, _loggerMock.Object,
+            Options.Create(new EmailOptions()), _cacheServiceMock.Object);
 
     [Fact]
     public async Task Handle_ValidCommand_CreatesUser()
@@ -47,10 +55,7 @@ public class RegisterCommandHandlerTests
                 It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
             .ReturnsAsync(true);
 
-        var handler = new RegisterCommandHandler(
-            _contextMock.Object, _passwordHasherMock.Object,
-            _emailSenderMock.Object, _loggerMock.Object,
-            Options.Create(new EmailOptions()));
+        var handler = BuildHandler();
         var command = new RegisterCommand
         {
             Username = "newuser",
@@ -83,10 +88,7 @@ public class RegisterCommandHandlerTests
         _contextMock.Setup(c => c.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .Returns(() => throw dbUpdateEx);
 
-        var handler = new RegisterCommandHandler(
-            _contextMock.Object, _passwordHasherMock.Object,
-            _emailSenderMock.Object, _loggerMock.Object,
-            Options.Create(new EmailOptions()));
+        var handler = BuildHandler();
         var command = new RegisterCommand
         {
             Username = "duplicateuser",
@@ -112,10 +114,7 @@ public class RegisterCommandHandlerTests
         _contextMock.Setup(c => c.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .Returns(() => throw dbUpdateEx);
 
-        var handler = new RegisterCommandHandler(
-            _contextMock.Object, _passwordHasherMock.Object,
-            _emailSenderMock.Object, _loggerMock.Object,
-            Options.Create(new EmailOptions()));
+        var handler = BuildHandler();
         var command = new RegisterCommand
         {
             Username = "anotheruser",
@@ -144,10 +143,7 @@ public class RegisterCommandHandlerTests
         _contextMock.Setup(c => c.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .Returns(() => throw dbUpdateEx);
 
-        var handler = new RegisterCommandHandler(
-            _contextMock.Object, _passwordHasherMock.Object,
-            _emailSenderMock.Object, _loggerMock.Object,
-            Options.Create(new EmailOptions()));
+        var handler = BuildHandler();
         var command = new RegisterCommand
         {
             Username = "someuser",

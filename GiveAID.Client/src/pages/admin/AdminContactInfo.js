@@ -25,16 +25,15 @@ export default function AdminContactInfo({ pageKey = 'contact_info', title = 'Co
       setLoading(true);
       setError(null);
       const response = await api.get('/cms/pages', { params: { includeInactive: true } });
-      if (response.data.success) {
-        const found = response.data.data.find((p) => p.pageKey === pageKey);
-        if (found) {
-          setPage(found);
-          setPageTitle(found.pageTitle || title);
-          setContent(found.content || '');
-          setMetaDescription(found.metaDescription || '');
-        } else {
-          setError(`No CMS page found with key "${pageKey}". Run the migration script.`);
-        }
+      const list = Array.isArray(response) ? response : (response?.items || []);
+      const found = list.find((p) => p.pageKey === pageKey);
+      if (found) {
+        setPage(found);
+        setPageTitle(found.pageTitle || title);
+        setContent(found.content || '');
+        setMetaDescription(found.metaDescription || '');
+      } else {
+        setError(`No CMS page found with key "${pageKey}". Run the migration script.`);
       }
     } catch (err) {
       setError('Failed to load CMS pages.');
@@ -52,16 +51,14 @@ export default function AdminContactInfo({ pageKey = 'contact_info', title = 'Co
     setError(null);
     setSuccess(null);
     try {
-      const response = await api.put(`/cms/pages/${page.pageId}`, {
+      await api.put(`/cms/pages/${page.pageId}`, {
         pageTitle,
         content,
         metaDescription,
       });
-      if (response.data.success) {
-        setSuccess('Contact information saved. Visit the Contact page to verify.');
-      }
+      setSuccess('Contact information saved. Visit the Contact page to verify.');
     } catch (err) {
-      setError('Save failed.');
+      setError(err.message || 'Save failed.');
     } finally {
       setSaving(false);
     }

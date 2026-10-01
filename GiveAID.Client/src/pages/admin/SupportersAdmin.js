@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card, Table, Badge, Alert, Button, Modal, Form, Spinner, ButtonGroup } from 'react-bootstrap';
 import api from '../../services/api';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function SupportersAdmin() {
   const [items, setItems] = useState([]);
@@ -15,7 +16,7 @@ export default function SupportersAdmin() {
     try {
       setLoading(true);
       const response = await api.get('/supporters', { params: { activeOnly: false } });
-      if (response.data.success) setItems(response.data.data || []);
+      setItems(Array.isArray(response) ? response : (response?.items || []));
     } catch (err) {
       setError('Failed to load supporters.');
     } finally {
@@ -65,16 +66,16 @@ export default function SupportersAdmin() {
         contributionAmount: form.contributionAmount === '' ? null : Number(form.contributionAmount),
         displayOrder: Number(form.displayOrder) || 0,
       };
-      const response = editing
-        ? await api.put(`/supporters/${editing.organizationId}`, payload)
-        : await api.post('/supporters', payload);
-      if (response.data.success) {
-        setSuccess(editing ? 'Supporter updated.' : 'Supporter added.');
-        setShowModal(false);
-        load();
+      if (editing) {
+        await api.put(`/supporters/${editing.organizationId}`, payload);
+      } else {
+        await api.post('/supporters', payload);
       }
+      setSuccess(editing ? 'Supporter updated.' : 'Supporter added.');
+      setShowModal(false);
+      load();
     } catch (err) {
-      setError('Save failed.');
+      setError(err.message || 'Save failed.');
     }
   };
 
@@ -89,7 +90,8 @@ export default function SupportersAdmin() {
     }
   };
 
-  const isSuperAdmin = JSON.parse(localStorage.getItem('giveaid_user') || '{}')?.role === 'SuperAdmin';
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'Admin';
 
   return (
     <div>
@@ -134,7 +136,7 @@ export default function SupportersAdmin() {
                   <td className="text-end">
                     <ButtonGroup size="sm">
                       <Button variant="outline-primary" onClick={() => openEdit(o)}>Edit</Button>
-                      {isSuperAdmin && (
+                      {isAdmin && (
                         <Button variant="outline-danger" onClick={() => handleDelete(o)}>Delete</Button>
                       )}
                     </ButtonGroup>

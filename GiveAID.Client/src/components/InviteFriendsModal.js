@@ -38,7 +38,7 @@ export default function InviteFriendsModal({ show, onHide }) {
     try {
       setLoadingList(true);
       const res = await api.get('/invitations/mine');
-      if (res.data.success) setMyInvites(res.data.data || []);
+      setMyInvites(Array.isArray(res) ? res : (res?.items || []));
     } catch { /* non-fatal */ }
     finally { setLoadingList(false); }
   }, []);
@@ -64,14 +64,12 @@ export default function InviteFriendsModal({ show, onHide }) {
     setSuccess(null);
     try {
       const res = await api.post('/invitations', form);
-      if (res.data.success) {
-        setSuccess(res.data);
-        setForm(EMPTY);
-        setErrors({});
-        fetchMine();
-      }
+      setSuccess({ message: 'Invitation sent successfully.', data: res });
+      setForm(EMPTY);
+      setErrors({});
+      fetchMine();
     } catch (err) {
-      setServerError(err.response?.data?.message || 'Failed to send invitation.');
+      setServerError(err.response?.data?.message || err.message || 'Failed to send invitation.');
     } finally {
       setSending(false);
     }

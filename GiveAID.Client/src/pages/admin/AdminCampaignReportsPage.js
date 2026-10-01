@@ -24,7 +24,7 @@ const fmtDateTime = (d) => d ? new Date(d).toLocaleString('vi-VN', { dateStyle: 
 
 export default function AdminCampaignReportsPage() {
   const { user } = useAuth();
-  const canAccess = user?.role === 'Admin' || user?.role === 'SuperAdmin';
+  const canAccess = user?.role === 'Admin';
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -54,17 +54,34 @@ export default function AdminCampaignReportsPage() {
         api.get('/campaigns', { params: { pageSize: 100, page: 1 } }),
         api.get('/causes', { params: { activeOnly: false } }),
       ]);
-      if (stats.data.success) {
-        setOverview(stats.data.data?.overview || null);
-        setByMonth(stats.data.data?.donationsByMonth || []);
-        setByCampaign(stats.data.data?.donationsByCampaign || []);
-        setByCause(stats.data.data?.donationsByCause || []);
-      }
-      if (recent.data.success) setRecent(recent.data.data || []);
-      if (camps.data.success) setCampaigns(camps.data.data || []);
-      if (caus.data.success) setCauses(caus.data.data || []);
-    } catch {
-      setError('Failed to load reports data.');
+      // api.js unwraps the { success, message, data } envelope, so each entry is
+      // already the payload. /admin/stats returns a FLAT DashboardStatsDto and
+      // /campaigns returns a paged { items, total, … } result.
+      const campaignList = Array.isArray(camps) ? camps : (camps?.items || []);
+      const causeList = Array.isArray(caus) ? caus : (caus?.items || []);
+
+      setOverview(stats ? {
+        activeCampaigns: stats.activeCampaigns,
+        completedCampaigns: Math.max((stats.totalCampaigns || 0) - (stats.activeCampaigns || 0), 0),
+        totalDonations: stats.totalDonations,
+        recentDonationsAmount: stats.totalRaisedThisMonth,
+        totalDonors: stats.totalDonors,
+        activeProgrammes: stats.activeCampaigns,
+      } : null);
+      setByMonth(stats?.donationsByMonth || []);
+      // The API has no per-campaign/per-cause donation breakdown, so derive the
+      // "Top campaigns" ranking and cause bars from the lists we already have.
+      setByCampaign(
+        [...campaignList]
+          .sort((a, b) => (b.raisedAmount || 0) - (a.raisedAmount || 0))
+          .slice(0, 8)
+      );
+      setByCause(causeList);
+      setRecent(Array.isArray(recent) ? recent : []);
+      setCampaigns(campaignList);
+      setCauses(causeList);
+    } catch (err) {
+      setError(err.message || 'Failed to load reports data.');
     } finally {
       setLoading(false);
     }

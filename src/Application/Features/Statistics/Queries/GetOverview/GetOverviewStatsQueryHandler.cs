@@ -33,7 +33,12 @@ public class GetOverviewStatsQueryHandler : IRequestHandler<GetOverviewStatsQuer
         var totalDonations = await completedDonations.CountAsync(cancellationToken);
         var averageDonation = totalDonations > 0 ? totalRaised / totalDonations : 0;
 
-        var totalDonors = await completedDonations.Select(d => d.UserId).Distinct().CountAsync(cancellationToken);
+        // Anonymous donations (UserId == null) must NOT count as registered donors.
+        var totalDonors = await completedDonations
+            .Where(d => d.UserId != null)
+            .Select(d => d.UserId!.Value)
+            .Distinct()
+            .CountAsync(cancellationToken);
         var totalCampaigns = await _context.Campaigns.CountAsync(cancellationToken);
         var activeCampaigns = await _context.Campaigns.CountAsync(c => c.Status == "Active", cancellationToken);
         var totalBeneficiaries = await _context.Campaigns.SumAsync(c => c.BeneficiariesCount ?? 0, cancellationToken);

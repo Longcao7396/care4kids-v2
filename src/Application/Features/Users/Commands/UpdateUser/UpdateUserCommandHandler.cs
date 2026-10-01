@@ -1,4 +1,5 @@
 using GiveAID.Application.Features.Users.DTOs;
+using GiveAID.Application.Services;
 using MediatR;
 
 namespace GiveAID.Application.Features.Users.Commands.UpdateUser;
@@ -9,10 +10,12 @@ namespace GiveAID.Application.Features.Users.Commands.UpdateUser;
 public class UpdateUserCommandHandler : IRequestHandler<UpdateUserCommand, UserAdminDto>
 {
     private readonly IApplicationDbContext _context;
+    private readonly ICacheService _cacheService;
 
-    public UpdateUserCommandHandler(IApplicationDbContext context)
+    public UpdateUserCommandHandler(IApplicationDbContext context, ICacheService cacheService)
     {
         _context = context;
+        _cacheService = cacheService;
     }
 
     public async Task<UserAdminDto> Handle(UpdateUserCommand request, CancellationToken cancellationToken)
@@ -33,6 +36,8 @@ public class UpdateUserCommandHandler : IRequestHandler<UpdateUserCommand, UserA
         user.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync(cancellationToken);
+
+        _cacheService.InvalidateStatistics();
 
         return new UserAdminDto
         {

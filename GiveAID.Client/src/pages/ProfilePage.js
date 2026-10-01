@@ -33,9 +33,8 @@ const ProfilePage = () => {
     }
     const load = async () => {
       try {
-        const res = await api.get('/users/me');
-        if (res.data.success) {
-          const u = res.data.data;
+        const u = await api.get('/users/me');
+        if (u) {
           setProfile({
             fullName: u.fullName || '',
             phone: u.phone || '',
@@ -91,17 +90,13 @@ const ProfilePage = () => {
         currentPassword: changingPw ? pwCurrent : null,
         newPassword: changingPw ? pwNew : null,
       };
-      const res = await api.put('/users/me', payload);
-      if (res.data.success) {
-        setSuccess('Profile updated successfully.');
-        setPwCurrent('');
-        setPwNew('');
-        setPwConfirm('');
-        // Refresh local user context if name changed
-        if (refreshUser) await refreshUser();
-      } else {
-        setError(res.data.message || 'Update failed.');
-      }
+      await api.put('/users/me', payload);
+      setSuccess('Profile updated successfully.');
+      setPwCurrent('');
+      setPwNew('');
+      setPwConfirm('');
+      // Refresh local user context if name changed
+      if (refreshUser) await refreshUser();
     } catch (err) {
       setError(err.response?.data?.Message || err.response?.data?.message || err.message || 'Update failed.');
     } finally {

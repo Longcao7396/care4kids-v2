@@ -17,15 +17,33 @@ function CampaignDetailPage() {
   const [registerError, setRegisterError] = useState('');
 
   const fetchCampaignDetail = useCallback(async () => {
+    // The backend route is /campaigns/{id:int}, so a non-numeric or non-positive
+    // id can never resolve. Skip the request and show the not-found state.
+    if (!/^\d+$/.test(String(id)) || Number(id) <= 0) {
+      setCampaign(null);
+      setError('Campaign not found');
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
+      setError(null);
+      // api.js unwraps the { success, message, data } envelope, so `response`
+      // is the CampaignDto payload itself.
       const response = await api.get(`/campaigns/${id}`);
-      if (response.data.success) {
-        setCampaign(response.data.data);
+      if (response && response.campaignId) {
+        setCampaign(response);
+      } else {
+        setCampaign(null);
+        setError('Campaign not found');
       }
     } catch (err) {
-      setError('Unable to load campaign information');
-      console.error(err);
+      // The interceptor rejects with a normalised Error whose message already
+      // covers 404 / 403 / 5xx / network failures.
+      console.error(`Failed to load campaign ${id}:`, err.message, err._raw);
+      setCampaign(null);
+      setError(err.message || 'Unable to load campaign information');
     } finally {
       setLoading(false);
     }
@@ -56,7 +74,7 @@ function CampaignDetailPage() {
       state: {
         campaignId: campaign.campaignId,
         campaignName: campaign.campaignName,
-        causeId: campaign.cause?.causeId
+        causeId: campaign.causeId
       }
     });
   };
@@ -70,18 +88,16 @@ function CampaignDetailPage() {
     setRegisterSuccess('');
     setRegisterLoading(true);
     try {
-      const response = await api.post(`/campaigns/${id}/register`, {
+      // api.js unwraps the envelope; a resolved promise means success.
+      await api.post(`/campaigns/${id}/register`, {
         notes: ''
       });
-      if (response.data.success) {
-        setRegisterSuccess('Registration submitted! We will confirm your spot soon.');
-        // Refresh campaign to update participant count
-        fetchCampaignDetail();
-      } else {
-        setRegisterError(response.data.message || 'Registration failed. Please try again.');
-      }
+      setRegisterSuccess('Registration submitted! We will confirm your spot soon.');
+      // Refresh campaign to update participant count
+      fetchCampaignDetail();
     } catch (err) {
-      const msg = err.response?.data?.message || err.response?.data?.Message;
+      console.error(`Registration failed for campaign ${id}:`, err.message, err._raw);
+      const msg = err.message;
       if (msg && msg.toLowerCase().includes('already')) {
         setRegisterError('You have already registered for this event.');
       } else {
@@ -147,8 +163,8 @@ function CampaignDetailPage() {
           </Link>
 
           <div className="cdp-hero-badges">
-            {campaign.cause?.causeName && (
-              <span className="badge badge-teal">{campaign.cause.causeName}</span>
+            {campaign.causeName && (
+              <span className="badge badge-teal">{campaign.causeName}</span>
             )}
             <span className={`badge ${isActive ? 'badge-success' : 'badge-neutral'}`}>
               {campaign.status}
@@ -182,11 +198,30 @@ function CampaignDetailPage() {
           <Row>
             {/* Left column — story */}
             <Col lg={8} className="cdp-main">
-              {/* Description */}
-              <div className="cdp-section">
-                <p className="eyebrow">About This Campaign</p>
-                <p className="cdp-lead">{campaign.description}</p>
-              </div>
+              {/* Description — split into paragraphs on blank lines so the
+                  multi-paragraph copy supplied by the backend renders with
+                  proper spacing (matches the convention used for longDescription
+                  inside the Campaign Details tab). */}
+              {campaign.description && (() => {
+                const paragraphs = campaign.description
+                  .split(/\n\s*\n/)
+                  .map(p => p.trim())
+                  .filter(Boolean);
+                if (paragraphs.length === 0) return null;
+                return (
+                  <div className="cdp-section">
+                    <p className="eyebrow">About This Campaign</p>
+                    <p className="cdp-lead">{paragraphs[0]}</p>
+                    {paragraphs.length > 1 && (
+                      <div className="cdp-prose cdp-desc-rest">
+                        {paragraphs.slice(1).map((para, i) => (
+                          <p key={i}>{para}</p>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* Stats row */}
               <div className="cdp-stats-row">

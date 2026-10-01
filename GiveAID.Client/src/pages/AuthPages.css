@@ -167,36 +167,13 @@
   gap: 14px;
 }
 
-/* Logo icon — warm gradient with subtle inner ring */
-.auth-logo-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 64px;
-  height: 64px;
-  background: linear-gradient(135deg,
-    rgba(194, 65, 12, 0.14) 0%,
-    rgba(232, 122, 90, 0.06) 100%);
-  border-radius: 18px;
-  color: var(--c4k-warm);
-  border: 1px solid rgba(194, 65, 12, 0.18);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.6),
-    0 4px 14px rgba(194, 65, 12, 0.08);
-}
-
-.auth-logo-icon svg {
+/* Logo image — Care4Kids SVG branding */
+.auth-logo-image {
+  height: 85px;
+  width: auto;
   display: block;
-}
-
-.auth-logo-text {
-  display: inline-flex;
-  align-items: baseline;
-  font-family: var(--font-serif, Georgia, 'Times New Roman', serif);
-  font-size: 1.625rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  line-height: 1;
+  object-fit: contain;
+  margin: 0 auto;
 }
 
 .auth-logo-brand {
@@ -216,7 +193,7 @@
   font-weight: 700;
   color: var(--c4k-charcoal, #1C1917);
   letter-spacing: -0.025em;
-  margin: 22px 0 10px;
+  margin: 16px 0 10px;
   line-height: 1.2;
 }
 

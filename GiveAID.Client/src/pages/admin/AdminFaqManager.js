@@ -3,6 +3,7 @@ import {
   Alert, Button, Modal, Form, Spinner, Badge, InputGroup,
 } from 'react-bootstrap';
 import { faqService } from '../../services';
+import { useAuth } from '../../contexts/AuthContext';
 import { sanitizeHtml } from '../../utils/safeHtml';
 
 /* ── Validation ────────────────────────────── */
@@ -49,7 +50,7 @@ export default function AdminFaqManager() {
       setLoading(true);
       // activeOnly = false so admin sees inactive FAQs too
       const response = await faqService.getAll();
-      if (response.success) setItems(response.data || []);
+      setItems(Array.isArray(response) ? response : (response?.items || []));
     } catch (err) {
       setError('Failed to load FAQs.');
     } finally {
@@ -90,14 +91,14 @@ export default function AdminFaqManager() {
         ...form,
         displayOrder: parseInt(form.displayOrder) || 0,
       };
-      const response = editing
-        ? await faqService.update(editing.faqId, payload)
-        : await faqService.create(payload);
-      if (response.success) {
-        setSuccess(editing ? 'FAQ updated.' : 'FAQ added.');
-        setShowForm(false);
-        load();
+      if (editing) {
+        await faqService.update(editing.faqId, payload);
+      } else {
+        await faqService.create(payload);
       }
+      setSuccess(editing ? 'FAQ updated.' : 'FAQ added.');
+      setShowForm(false);
+      load();
     } catch (err) {
       setError('Save failed.');
     } finally {
@@ -118,7 +119,8 @@ export default function AdminFaqManager() {
     }
   };
 
-  const isSuperAdmin = JSON.parse(localStorage.getItem('giveaid_user') || '{}')?.role === 'SuperAdmin';
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'Admin';
 
   const filtered = items.filter((item) => {
     const s = search.toLowerCase();
@@ -224,7 +226,7 @@ export default function AdminFaqManager() {
                 <Button variant="outline-primary" size="sm" onClick={() => openEdit(item)}>
                   <i className="bi bi-pencil me-1"></i>Edit
                 </Button>
-                {isSuperAdmin && (
+                {isAdmin && (
                   <Button variant="outline-danger" size="sm" onClick={() => setDeleteConfirm(item.faqId)}>
                     <i className="bi bi-trash me-1"></i>Delete
                   </Button>

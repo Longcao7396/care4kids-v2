@@ -1,7 +1,6 @@
 ================================================================
                  GIVEAID v2.0 - HƯỚNG DẪN SỬ DỤNG
-              (Cho người không biết lập trình)
-================================================================
+             ============
 
 Mục đích: Chạy website GiveAID trên máy tính cá nhân để test.
 
@@ -9,22 +8,34 @@ Mục đích: Chạy website GiveAID trên máy tính cá nhân để test.
   BƯỚC 1 — CÀI ĐẶT MÔI TRƯỜNG (CHỈ LÀM MỘT LẦN)
 ────────────────────────────────────────────────────────────────
 
-Cần cài 2 thứ trước khi chạy được:
+Cần cài 3 thứ trước khi chạy được:
 
   1) .NET SDK 10
      → Tải: https://dotnet.microsoft.com/download/dotnet/10.0
      → Chọn "SDK 10.0.x → Windows → x64"
      → Mở file .exe vừa tải → nhấn Install → đợi xong → đóng lại
 
-  2) Node.js (phiên bản 18 trở lên)
+  2) Node.js (phiên bản 18 LTS hoặc 20+)
      → Tải: https://nodejs.org/
      → Nhấn nút "LTS" lớn màu xanh (khoảng 20MB)
      → Mở file .msi vừa tải → Next liên tục → Install → Finish
+
+  3) SQL Server LocalDB ⚠ BẮT BUỘC
+     → LocalDB KHÔNG đi kèm .NET SDK. Phải cài riêng.
+     → Cách 1 (khuyến nghị): tải SQL Server Express từ
+        https://www.microsoft.com/sql-server/sql-server-downloads
+        → tick chọn "LocalDB" trong installer.
+     → Cách 2: nếu đã có Visual Studio → mở Visual Studio Installer
+        → Modify → Individual components → tick "SQL Server Express LocalDB".
+     → Kiểm tra sau khi cài: mở cmd mới, gõ
+        sqllocaldb versions
+       phải ra version SQL Server (vd 17.0.x).
 
   Sau khi cài xong, MỞ TERMINAL MỚI (Win + R → gõ cmd → Enter)
   rồi gõ:
         dotnet --version
         node --version
+        sqllocaldb versions
   Thấy hiện số phiên bản là OK.
 
 ────────────────────────────────────────────────────────────────
@@ -52,7 +63,7 @@ Cần cài 2 thứ trước khi chạy được:
 
   Admin:
     Username: admin
-    Password: DevAdmin@123  (dat trong env var ADMIN_PASSWORD khi chay START.bat)
+    Password: Admin@123  (dat trong env var ADMIN_PASSWORD khi chay START.bat)
 
   User thường:
     Username: demo

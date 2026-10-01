@@ -31,13 +31,13 @@ import SupportersPage from './pages/SupportersPage';
 import OurPartnersPage from './pages/OurPartnersPage';
 import ContactPage from './pages/ContactPage';
 import HelpCentrePage from './pages/HelpCentrePage';
+import { PrivacyPolicyPage, TermsOfServicePage } from './pages/CmsPublicPage';
 import GalleryPage from './pages/GalleryPage';
 import RaiseQueryPage from './pages/RaiseQueryPage';
 
 // Admin Pages
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminCmsPage from './pages/admin/AdminCmsPage';
-import AdminAboutPage from './pages/admin/AdminAboutPage';
 import AdminContactPage from './pages/admin/AdminContactPage';
 import AdminPartnersPage from './pages/admin/AdminPartnersPage';
 import AdminGalleryPage from './pages/admin/AdminGalleryPage';
@@ -55,7 +55,8 @@ import AdminRegistrationsPage from './pages/admin/AdminRegistrationsPage';
 import './styles/App.css';
 import 'bootstrap/dist/css/bootstrap.min.css';
 
-const ADMIN_ROLES = ['Admin', 'SuperAdmin'];
+// Admin is the single highest administrative role. There is no SuperAdmin role.
+const ADMIN_ROLES = ['Admin'];
 
 function App() {
   return (
@@ -65,7 +66,7 @@ function App() {
         <div className="App">
           <Routes>
             {/* ═══════════════════════════════════════════════════
-                ADMIN ROUTES — own shell, require Admin/SuperAdmin
+                ADMIN ROUTES — own shell, require Admin role
                ═══════════════════════════════════════════════════ */}
             <Route
               path="/admin"
@@ -85,7 +86,6 @@ function App() {
               <Route path="gallery" element={<AdminGalleryPage />} />
               <Route path="achievements" element={<AdminAchievementsPage />} />
               <Route path="cms" element={<AdminCmsPage />} />
-              <Route path="about" element={<AdminAboutPage />} />
               <Route path="queries" element={<AdminQueriesPage />} />
               <Route path="contacts" element={<AdminContactPage />} />
               <Route path="invitations" element={<AdminInvitationsPage />} />
@@ -122,6 +122,8 @@ function App() {
                       <Route path="/contact" element={<ContactPage />} />
                       <Route path="/help-centre" element={<HelpCentrePage />} />
                       <Route path="/gallery" element={<GalleryPage />} />
+                      <Route path="/privacy" element={<PrivacyPolicyPage />} />
+                      <Route path="/terms" element={<TermsOfServicePage />} />
 
                       {/* Protected (authenticated) routes */}
                       <Route

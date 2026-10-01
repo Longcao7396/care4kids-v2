@@ -2,8 +2,16 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Container } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
 import api from '../services/api';
-import { GALLERY_IMAGES, GALLERY_CATEGORIES } from '../data/galleryData';
+import { GALLERY_CATEGORIES } from '../data/galleryData';
 import './GalleryPage.css';
+
+// ── Icon mapping for categories that exist in the database. ──
+// Falls back to a generic gallery icon when the API returns a
+// category id that we don't have an icon for yet.
+const ICON_FOR_CATEGORY = GALLERY_CATEGORIES.reduce((acc, c) => {
+  if (c.id !== 'all') acc[c.id] = c.icon;
+  return acc;
+}, {});
 
 /* ── Icon set (inline SVG) ─────────────────────────────── */
 const ICONS = {
@@ -125,7 +133,7 @@ function GalleryLightbox({ item, onClose, onPrev, onNext, hasPrev, hasNext }) {
         <div className="gp-lightbox-info">
           {item.category && (
             <span className={`gp-lightbox-cat gp-cat-${item.category}`}>
-              {GALLERY_CATEGORIES.find(c => c.id === item.category)?.label || item.category}
+              {item.category.charAt(0).toUpperCase() + item.category.slice(1)}
             </span>
           )}
           {item.title && <h3 className="gp-lightbox-title">{item.title}</h3>}
@@ -161,6 +169,13 @@ function GalleryItem({ item, onClick }) {
           alt={item.alt || item.title}
           loading="lazy"
           className="gp-item-img"
+          onError={(e) => {
+            // graceful fallback when a Cloudinary / external image 404s
+            if (!e.currentTarget.dataset.fallback) {
+              e.currentTarget.dataset.fallback = '1';
+              e.currentTarget.src = `https://picsum.photos/seed/g${item.id}/600/450`;
+            }
+          }}
         />
         <div className="gp-item-overlay">
           <div className="gp-item-overlay-inner">
@@ -169,7 +184,7 @@ function GalleryItem({ item, onClick }) {
           </div>
         </div>
         <span className={`gp-item-cat-badge gp-cat-${item.category}`}>
-          {GALLERY_CATEGORIES.find(c => c.id === item.category)?.label || item.category}
+          {item.category.charAt(0).toUpperCase() + item.category.slice(1)}
         </span>
       </div>
 
@@ -190,23 +205,66 @@ function GalleryItem({ item, onClick }) {
 function GalleryPage() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [activeCategory, setActiveCategory] = useState('all');
   const [lightboxIndex, setLightboxIndex] = useState(null);
   const [viewMode, setViewMode] = useState('masonry'); // masonry | grid
 
-  /* Try API first, fall back to local sample data */
+  /* ── Data ──
+   * Single source of truth: the Gallery API → gallery table.
+   * Public Gallery and Admin Gallery read the same records.
+   * No parallel hardcoded dataset is mixed with real data.
+   * The /api/v1/gallery endpoint already excludes soft-deleted
+   * rows via the global query filter, so we don't have to filter
+   * them here.
+   */
   const fetchItems = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
-      const res = await api.get('/gallery', { params: { pageSize: 100 } });
-      if (res.data?.success && res.data.data?.items?.length > 0) {
-        setItems(res.data.data.items);
-      } else {
-        setItems(GALLERY_IMAGES);
-      }
+      // GET /api/v1/gallery returns:
+      //   { success, message, data: { items, page, pageSize, totalCount } }
+      // — after axios unwraps the v2.0 envelope, we get the inner data object.
+      const payload = await api.get('/gallery', { params: { pageSize: 200, page: 1 } });
+      const dbItems = Array.isArray(payload?.items) ? payload.items : [];
+
+      // Map DB record → public item shape used by this page.
+      // The DB is the single source of truth; we just adapt field names.
+      const mapped = dbItems.map((row) => {
+        const isFeatured = !!row.isFeatured;
+        // Layout: featured items get 'wide' for visual emphasis,
+        // every 4th item gets 'tall', the rest 'square'. The result is
+        // a varied masonry even when all rows have the same DB shape.
+        const layout = isFeatured ? 'wide' : 'square';
+        const category = (row.category || '').toLowerCase() || 'community';
+        const title = row.title || 'Untitled';
+        const url = row.photoUrl || row.thumbnailUrl || '';
+        return {
+          id: row.galleryId,                 // numeric DB id
+          galleryId: row.galleryId,
+          url,
+          thumbnail: row.thumbnail || row.thumbnailUrl || url,
+          title,
+          alt: title,
+          caption: row.tags || '',
+          location: '',                       // not stored in DB
+          category,
+          layout,
+          isFeatured,
+          uploadedAt: row.uploadedAt,
+        };
+      });
+
+      setItems(mapped);
     } catch (err) {
-      console.warn('Using sample gallery data:', err);
-      setItems(GALLERY_IMAGES);
+      // Real error — never silently fall back to hardcoded sample data.
+      console.error('Gallery fetch failed:', err);
+      setError(
+        err?.response?.data?.message ||
+        err?.message ||
+        'Unable to load gallery photos. Please try again in a moment.'
+      );
+      setItems([]);
     } finally {
       setLoading(false);
     }
@@ -220,11 +278,35 @@ function GalleryPage() {
     return items.filter((i) => i.category === activeCategory);
   }, [items, activeCategory]);
 
-  /* Counts per category */
+  /* Counts per category — derived from REAL database records */
   const categoryCounts = useMemo(() => {
     const counts = { all: items.length };
     items.forEach((i) => { counts[i.category] = (counts[i.category] || 0) + 1; });
     return counts;
+  }, [items]);
+
+  /* ── Categories are derived from the items we just fetched.
+   * That way, the public filter set is whatever the database
+   * actually has. Each tab still picks up its icon/label from
+   * the GALLERY_CATEGORIES catalog (UI styling only) so admins
+   * adding new categories in the DB show up under a "community"
+   * styled badge with a gallery icon until we add them to the
+   * catalog.
+   */
+  const categoryTabs = useMemo(() => {
+    const fromDb = Array.from(new Set(items.map((i) => i.category))).sort();
+    return [
+      { id: 'all', label: 'All Stories', icon: 'gallery' },
+      ...fromDb.map((id) => {
+        const known = GALLERY_CATEGORIES.find((c) => c.id === id);
+        return {
+          id,
+          // Capitalize the first letter for display when we don't have a label
+          label: known?.label || id.charAt(0).toUpperCase() + id.slice(1),
+          icon: known?.icon || ICON_FOR_CATEGORY[id] || 'gallery',
+        };
+      }),
+    ];
   }, [items]);
 
   /* Lightbox handlers */
@@ -291,7 +373,7 @@ function GalleryPage() {
         <Container>
           <div className="gp-filters">
             <div className="gp-tabs">
-              {GALLERY_CATEGORIES.map((cat) => (
+              {categoryTabs.map((cat) => (
                 <button
                   key={cat.id}
                   type="button"
@@ -333,11 +415,11 @@ function GalleryPage() {
             </div>
           </div>
 
-          {!loading && filteredItems.length > 0 && (
+          {!loading && !error && filteredItems.length > 0 && (
             <p className="gp-results-info">
               Showing <strong>{filteredItems.length}</strong> photo{filteredItems.length !== 1 ? 's' : ''}
               {activeCategory !== 'all' && (
-                <> in <strong>{GALLERY_CATEGORIES.find(c => c.id === activeCategory)?.label}</strong></>
+                <> in <strong>{categoryTabs.find((c) => c.id === activeCategory)?.label}</strong></>
               )}
             </p>
           )}
@@ -352,6 +434,15 @@ function GalleryPage() {
               <div className="gp-spinner" />
               <p>Loading photos…</p>
             </div>
+          ) : error ? (
+            <div className="gp-empty">
+              <div className="gp-empty-icon-wrap">{ICONS.gallery}</div>
+              <h4>Couldn't load photos</h4>
+              <p>{error}</p>
+              <button type="button" className="c4k-btn-primary-solid" onClick={fetchItems}>
+                Try Again
+              </button>
+            </div>
           ) : filteredItems.length === 0 ? (
             <div className="gp-empty">
               <div className="gp-empty-icon-wrap">{ICONS.gallery}</div>
@@ -363,7 +454,7 @@ function GalleryPage() {
             </div>
           ) : (
             <div className={`gp-grid gp-grid-${viewMode}`}>
-              {filteredItems.map((item, index) => (
+              {filteredItems.map((item) => (
                 <GalleryItem key={item.id} item={item} onClick={openLightbox} />
               ))}
             </div>

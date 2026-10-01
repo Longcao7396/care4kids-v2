@@ -134,12 +134,19 @@ project-NGO/
 
 ### Prerequisites
 
-- .NET 10 SDK
-- Node.js 18+
-- Visual Studio 2022 / Rider / VS Code (ships with **LocalDB** — the project's
-  default SQL Server instance). No separate SQL Server install needed.
+- .NET 10 SDK (tested on 10.0.401)
+- Node.js 18 LTS / 20 LTS / 22+ (tested on v24.18.0)
+- **SQL Server LocalDB** — required, NOT bundled with .NET SDK. Three install options:
+  - Install SQL Server 2022/2025 Express with LocalDB option: <https://www.microsoft.com/sql-server/sql-server-downloads>
+  - Or Visual Studio Installer → Modify → Individual components → tick "SQL Server Express LocalDB"
+  - Or install `SqlLocalDB.msi` from the SQL Server Express media.
+- *(Optional)* Visual Studio 2022 / Rider / VS Code — only needed if you want to edit C# code; the project runs fine from the command line via `START.bat`.
 
 ### 1. Database
+
+The project uses `(localdb)\MSSQLLocalDB` as its single source of truth.
+LocalDB is created on first use and the `MSSQLLocalDB` instance is generated
+automatically by the .NET driver on first connection attempt.
 
 ```powershell
 # Recommended: let EF Core create + seed it on first run
@@ -175,7 +182,7 @@ npm install
 npm start
 # Public site: http://localhost:3000
 # Admin dashboard: http://localhost:3000/admin
-# Login: admin@give-aid.org / Admin@123
+# Login: admin / Admin@123
 ```
 
 ### 4. Run Tests
@@ -187,10 +194,12 @@ dotnet test GiveAID.V2.slnx
 
 ## Default Credentials
 
-| Role       | Email                  | Password    |
-|------------|------------------------|-------------|
-| Admin      | admin@give-aid.org     | Admin@123   |
-| User       | user@give-aid.org      | User@123    |
+| Role       | Username | Password    | Email                |
+|------------|----------|-------------|----------------------|
+| Admin      | admin    | Admin@123   | admin@give-aid.org   |
+| User       | demo     | Demo@123    | demo@give-aid.org    |
+
+**Note:** Login requires **username**, not email. Use `admin` or `demo` in the username field.
 
 ## Architecture Highlights
 

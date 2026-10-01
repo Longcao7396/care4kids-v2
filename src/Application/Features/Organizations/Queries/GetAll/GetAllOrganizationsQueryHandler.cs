@@ -45,6 +45,7 @@ public class GetAllOrganizationsQueryHandler : IRequestHandler<GetAllOrganizatio
             ContactEmail = o.ContactEmail,
             ContactPhone = o.ContactPhone,
             Address = o.Address,
+            RegistrationNumber = o.RegistrationNumber,
             Mission = o.Mission,
             Vision = o.Vision,
             ContributionAmount = o.ContributionAmount,

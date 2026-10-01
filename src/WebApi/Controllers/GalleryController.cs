@@ -40,7 +40,7 @@ public class GalleryController : ControllerBase
         [FromQuery] int pageSize = 24,
         [FromQuery] string? category = null)
     {
-        var items = await _mediator.Send(new GetAllGalleryQuery
+        var result = await _mediator.Send(new GetAllGalleryQuery
         {
             Page = page,
             PageSize = pageSize,
@@ -50,7 +50,7 @@ public class GalleryController : ControllerBase
         {
             success = true,
             message = "OK",
-            data = new { items, page, pageSize, totalCount = items.Count() }
+            data = new { items = result.Items, page, pageSize, totalCount = result.TotalCount }
         });
     }
 
@@ -70,7 +70,7 @@ public class GalleryController : ControllerBase
     {
         // Distinct categories from gallery items.
         var all = await _mediator.Send(new GetAllGalleryQuery { Page = 1, PageSize = 1000 });
-        var cats = all
+        var cats = all.Items
             .Where(g => !string.IsNullOrWhiteSpace(g.Category))
             .Select(g => g.Category!)
             .Distinct()
@@ -99,7 +99,7 @@ public class GalleryController : ControllerBase
     public async Task<IActionResult> GetById(int id)
     {
         var items = await _mediator.Send(new GetAllGalleryQuery { Page = 1, PageSize = 1000 });
-        var dto = items.FirstOrDefault(g => g.GalleryId == id);
+        var dto = items.Items.FirstOrDefault(g => g.GalleryId == id);
         if (dto == null)
         {
             return NotFound(new { success = false, message = $"Gallery item {id} not found", data = (object?)null });

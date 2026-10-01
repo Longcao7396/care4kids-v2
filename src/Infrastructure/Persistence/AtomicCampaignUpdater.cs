@@ -1,68 +1,105 @@
-using System.Data.Common;
+using System.Runtime.CompilerServices;
 using GiveAID.Application.Common.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace GiveAID.Infrastructure.Persistence;
 
 /// <summary>
 /// Provides atomic database operations that cannot be safely expressed through EF Core
-/// change tracking due to race conditions (e.g., read-modify-write on campaign RaisedAmount).
-/// Uses raw SQL to ensure atomicity of the increment operation.
+/// change tracking due to race conditions (e.g., read-modify-write on campaign RaisedAmount,
+/// or concurrent donation status transitions).
+/// Uses raw SQL against the scoped <see cref="GiveAIDDbContext"/>, which means every
+/// UPDATE automatically enlists in the active <c>IDbContextTransaction</c> started by
+/// <see cref="DbTransactionFactory"/>. Combined with <c>SaveChangesAsync</c> on the same
+/// scoped context, the entire donation-state-transition-plus-aggregate-update block
+/// commits or rolls back as one transaction.
 /// </summary>
 public class AtomicCampaignUpdater : IAtomicCampaignUpdater
 {
     private readonly GiveAIDDbContext _context;
+    private readonly ILogger<AtomicCampaignUpdater> _logger;
 
-    public AtomicCampaignUpdater(GiveAIDDbContext context)
+    public AtomicCampaignUpdater(GiveAIDDbContext context, ILogger<AtomicCampaignUpdater> logger)
     {
         _context = context;
+        _logger = logger;
     }
 
     /// <inheritdoc/>
-    /// C-04.1 FIX: Uses an atomic SQL UPDATE to increment RaisedAmount.
-    /// SQL: UPDATE campaigns SET raised_amount = raised_amount + @amount WHERE campaign_id = @id
-    /// The database handles the increment atomically — no read-modify-write race window.
-    ///
-    /// C-04.2: When an external transaction is provided, the raw SQL participates in that
-    /// same transaction, ensuring donation insert + campaign update are fully atomic.
-    /// </summary>
-    public async Task IncrementRaisedAmountAsync(
-        int campaignId,
-        decimal amount,
-        DbConnection? existingConnection = null,
-        DbTransaction? existingTransaction = null,
+    /// SQL: UPDATE donations SET payment_status = @to WHERE donation_id = @id AND payment_status = @from
+    /// The row count returned by the database is the source of truth for "who won the race".
+    public Task<bool> TryTransitionDonationStatusAsync(
+        int donationId,
+        string fromStatus,
+        string toStatus,
         CancellationToken cancellationToken = default)
     {
-        if (existingConnection != null && existingTransaction != null)
-        {
-            // C-04.2: Participate in caller's external transaction.
-            // This ensures both SaveChanges (donation insert) and this UPDATE
-            // commit together or rollback together.
-            await using var cmd = existingConnection.CreateCommand();
-            cmd.CommandText = "UPDATE campaigns SET raised_amount = raised_amount + @amount WHERE campaign_id = @id";
-            cmd.Parameters.Add(CreateParam(cmd, "@amount", amount));
-            cmd.Parameters.Add(CreateParam(cmd, "@id", campaignId));
-            cmd.Transaction = existingTransaction;
-            await cmd.ExecuteNonQueryAsync(cancellationToken);
-        }
-        else
-        {
-            // Standalone call — use EF Core's execution strategy (no external transaction)
-            await _context.Database.ExecuteSqlInterpolatedAsync(
-                $"UPDATE campaigns SET raised_amount = raised_amount + {amount} WHERE campaign_id = {campaignId}",
-                cancellationToken);
-        }
+        // FormattableStringFactory.Create turns (string, args[]) into a FormattableString
+        // so that Database.ExecuteSqlInterpolatedAsync parameterizes it correctly.
+        var sql = FormattableStringFactory.Create(
+            "UPDATE donations SET payment_status = {0} " +
+            "WHERE donation_id = {1} AND payment_status = {2}",
+            toStatus, donationId, fromStatus);
+        return ExecuteTransitionAsync(sql, cancellationToken);
     }
 
-    /// <summary>
-    /// Creates a typed DbParameter for the current command's database provider.
-    /// Works with SQL Server, PostgreSQL, SQLite, etc.
-    /// </summary>
-    private static DbParameter CreateParam(DbCommand cmd, string name, object value)
+    private async Task<bool> ExecuteTransitionAsync(FormattableString sql, CancellationToken cancellationToken)
     {
-        var param = cmd.CreateParameter();
-        param.ParameterName = name;
-        param.Value = value;
-        return param;
+        var rowsAffected = await _context.Database.ExecuteSqlInterpolatedAsync(sql, cancellationToken);
+        _logger.LogInformation(
+            "AtomicCampaignUpdater.TryTransitionDonationStatusAsync SQL={Sql} RowsAffected={Rows}",
+            sql.Format, rowsAffected);
+        return rowsAffected == 1;
+    }
+
+    /// <inheritdoc/>
+    /// C-04.1 FIX: atomic SQL UPDATE. The scoped DbContext's connection is reused; EF
+    /// auto-enlists in the active IDbContextTransaction, so this UPDATE shares commit
+    /// fate with SaveChangesAsync on the same context.
+    public async Task<int> IncrementRaisedAmountAsync(
+        int campaignId,
+        decimal amount,
+        CancellationToken cancellationToken = default)
+    {
+        var sql = FormattableStringFactory.Create(
+            "UPDATE campaigns SET raised_amount = raised_amount + {0} " +
+            "WHERE campaign_id = {1}",
+            amount, campaignId);
+        var rowsAffected = await _context.Database.ExecuteSqlInterpolatedAsync(sql, cancellationToken);
+
+        if (rowsAffected == 0)
+        {
+            _logger.LogWarning(
+                "AtomicCampaignUpdater.IncrementRaisedAmountAsync affected 0 rows. CampaignId={CampaignId}, Delta={Delta}",
+                campaignId, amount);
+        }
+
+        return rowsAffected;
+    }
+
+    /// <inheritdoc/>
+    /// Floor-guard clause <c>raised_amount + @delta &gt;= 0</c> prevents the column from
+    /// going negative under concurrent decrements. If the guard blocks the update, 0 rows
+    /// are affected and the column stays at its current value (the floor).
+    public async Task<int> ApplyCauseRaisedAmountDeltaAsync(
+        int causeId,
+        decimal delta,
+        CancellationToken cancellationToken = default)
+    {
+        var sql = FormattableStringFactory.Create(
+            "UPDATE causes SET raised_amount = raised_amount + {0} " +
+            "WHERE cause_id = {1} AND raised_amount + {0} >= 0",
+            delta, causeId);
+        var rowsAffected = await _context.Database.ExecuteSqlInterpolatedAsync(sql, cancellationToken);
+
+        if (rowsAffected == 0)
+        {
+            _logger.LogWarning(
+                "AtomicCampaignUpdater.ApplyCauseRaisedAmountDeltaAsync affected 0 rows. CauseId={CauseId}, Delta={Delta}",
+                causeId, delta);
+        }
+
+        return rowsAffected;
     }
 }

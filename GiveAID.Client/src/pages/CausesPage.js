@@ -26,30 +26,52 @@ const CausesPage = () => {
 
   const loadTree = async () => {
     try {
-      // New tree endpoint returns [{ parent, subCauses: [...] }, ...]
+      // The tree endpoint returns an array of nodes where each node IS
+      // the parent cause itself with an embedded `subCauses` array.
+      // Older backends wrapped the parent in `{ parent, subCauses }`.
+      // Normalise both shapes so the renderer doesn't blow up.
       const response = await causesService.getTree(true);
-      if (response.success) {
-        setTree(response.data || []);
-        // Expand all parents by default so the user immediately sees the brief
-        const initial = {};
-        (response.data || []).forEach((node) => {
-          if (node.subCauses?.length) initial[node.parent.causeId] = true;
-        });
-        setExpanded(initial);
-      } else {
+      let nodes = Array.isArray(response) ? response : (response?.items || []);
+
+      const normalised = nodes
+        .map((node) => {
+          if (!node) return null;
+          // Unwrap legacy `{ parent, subCauses }` envelope.
+          const parent = node.parent && node.parent.causeId != null
+            ? node.parent
+            : node.causeId != null
+              ? node
+              : null;
+          if (!parent) return null;
+          const subs = Array.isArray(node.subCauses)
+            ? node.subCauses.filter((s) => s && typeof s === 'object' && s.causeId != null)
+            : [];
+          return { parent, subCauses: subs };
+        })
+        .filter((n) => n !== null);
+
+      if (!normalised.length) {
         // Backwards compatibility: older backends may only expose /api/causes
         const flat = await causesService.getAll(true);
-        if (flat.success) {
-          const parents = (flat.data || []).filter((c) => !c.parentCauseId);
-          const subs = (flat.data || []).filter((c) => c.parentCauseId);
-          setTree(
-            parents.map((p) => ({
-              parent: p,
-              subCauses: subs.filter((s) => s.parentCauseId === p.causeId)
-            }))
-          );
-        }
+        const list = Array.isArray(flat) ? flat : (flat?.items || []);
+        const safeList = list.filter((c) => c && typeof c === 'object' && c.causeId != null);
+        const parents = safeList.filter((c) => !c.parentCauseId);
+        const subs = safeList.filter((c) => c.parentCauseId);
+        parents.forEach((p) => {
+          normalised.push({
+            parent: p,
+            subCauses: subs.filter((s) => s.parentCauseId === p.causeId),
+          });
+        });
       }
+
+      setTree(normalised);
+      // Expand all parents by default so the user immediately sees the brief
+      const initial = {};
+      normalised.forEach((node) => {
+        if (node.subCauses?.length) initial[node.parent.causeId] = true;
+      });
+      setExpanded(initial);
     } catch (error) {
       console.error('Error loading causes:', error);
     } finally {

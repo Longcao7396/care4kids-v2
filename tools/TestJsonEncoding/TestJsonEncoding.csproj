@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>TestJsonEncoding</RootNamespace>
+    <AssemblyName>TestJsonEncoding</AssemblyName>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+</Project>

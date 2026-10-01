@@ -279,8 +279,8 @@
 
 .cp-impact-item {
   padding: var(--space-3);
-  flex: 1;
-  min-width: 120px;
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 .cp-impact-number {
@@ -290,6 +290,9 @@
   color: var(--c4k-white);
   letter-spacing: -0.03em;
   line-height: 1.1;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  max-width: 100%;
 }
 
 .cp-impact-label {
@@ -709,40 +712,72 @@
   flex-wrap: wrap;
 }
 
-.cp-page-btn {
+/* Pagination buttons.
+   These render as react-bootstrap <Button> elements, so they also carry
+   .btn.btn-primary. Bootstrap's stylesheet is imported after App.css, so the
+   selectors below are doubled up (.cp-page-btn.cp-page-btn) to win on
+   specificity and keep the Care4Kids teal palette instead of Bootstrap blue.
+   Layout, spacing, size and font-size are intentionally unchanged. */
+.cp-page-btn,
+.cp-page-btn.cp-page-btn {
   border: 1px solid var(--c4k-gray-200);
   background: var(--c4k-white);
+  background-image: none;
   color: var(--c4k-gray-700, #444);
   border-radius: 10px;
   padding: 8px 14px;
   font-weight: 600;
   font-size: 0.9rem;
   line-height: 1;
-  transition: all 0.15s ease;
+  box-shadow: none;
+  transition: background-color var(--t-fast), border-color var(--t-fast),
+              color var(--t-fast), box-shadow var(--t-fast);
 }
 
-.cp-page-btn:hover:not(:disabled) {
-  border-color: #E87A5A;
-  color: #E87A5A;
-  background: rgba(232, 122, 90, 0.06);
+.cp-page-btn.cp-page-btn:hover:not(:disabled) {
+  border-color: var(--c4k-teal);
+  color: var(--c4k-teal-dark);
+  background: var(--c4k-teal-soft);
 }
 
-.cp-page-btn:disabled {
-  opacity: 0.4;
+.cp-page-btn.cp-page-btn:active:not(:disabled) {
+  border-color: var(--c4k-teal-dark);
+  color: var(--c4k-teal-darker);
+  background: var(--c4k-teal-light);
+}
+
+/* Keyboard focus ring, consistent with other interactive elements */
+.cp-page-btn.cp-page-btn:focus-visible {
+  outline: 2px solid var(--c4k-teal);
+  outline-offset: 2px;
+}
+
+.cp-page-btn.cp-page-btn:disabled {
+  background: var(--c4k-white);
+  border-color: var(--c4k-gray-200);
+  color: var(--c4k-gray-400);
+  opacity: 0.55;
   cursor: not-allowed;
+  box-shadow: none;
 }
 
-.cp-page-number {
+.cp-page-number,
+.cp-page-btn.cp-page-number {
   min-width: 40px;
   text-align: center;
   padding: 8px 12px;
 }
 
-.cp-page-number.active {
-  background: linear-gradient(135deg, #E87A5A 0%, #D86A4A 100%);
-  border-color: transparent;
-  color: #FFFFFF;
-  box-shadow: 0 4px 12px rgba(232, 122, 90, 0.25);
+/* Current page: solid teal so it reads clearly against the outlined siblings.
+   White on #0E7490 is ~5.2:1 contrast (WCAG AA for normal text). */
+.cp-page-btn.cp-page-number.active,
+.cp-page-btn.cp-page-number.active:hover,
+.cp-page-btn.cp-page-number.active:focus {
+  background: var(--c4k-teal);
+  background-image: none;
+  border-color: var(--c4k-teal);
+  color: var(--c4k-white);
+  box-shadow: 0 2px 8px rgba(14, 116, 144, 0.25);
 }
 
 .cp-campaign-card {
@@ -774,6 +809,47 @@
   height: 100%;
   object-fit: cover;
   transition: transform var(--t-slow);
+}
+
+/* Portrait-orientation sources in the 414x200 landscape card.
+   object-fit: cover scales to fill the width, so only ~14-20% of the
+   original height stays visible and the default centre crop lands below
+   the subjects' faces. Biasing object-position upward keeps faces in
+   frame without stretching, re-encoding, or replacing any image.
+   Values below were measured against the live card size. */
+.cp-card-image img[src*="C114.jpg"] {
+  object-position: center 20%;
+}
+
+.cp-card-image img[src*="C105.jpg"] {
+  object-position: center 15%;
+}
+
+.cp-card-image img[src*="C042.jpg"] {
+  object-position: center 33%;
+}
+
+.cp-card-image img[src*="C022.jpg"] {
+  object-position: center 20%;
+}
+
+.cp-card-image img[src*="C023.jpg"] {
+  object-position: center 15%;
+}
+
+/* Landscape sources that are still much taller than the 2.07:1 card
+   (all ~1.3:1, so ~36% of the height is cropped). The default centre
+   crop clips the children's heads, so nudge the band upward. */
+.cp-card-image img[src*="C066.jpg"] {
+  object-position: center 18%;
+}
+
+.cp-card-image img[src*="C061.jpg"] {
+  object-position: center 25%;
+}
+
+.cp-card-image img[src*="C070.jpg"] {
+  object-position: center 15%;
 }
 
 .cp-campaign-card:hover .cp-card-image img {

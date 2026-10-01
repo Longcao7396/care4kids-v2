@@ -254,13 +254,15 @@ Dự án **Give-AID NGO Website Platform** đã được tạo hoàn chỉnh v�
 ### Seeded Data
 
 **Admin Account:**
+- Username: admin
 - Email: admin@give-aid.org
 - Password: Admin@123
 - Role: Admin
 
 **Demo User:**
-- Email: user@example.com
-- Password: User@123
+- Username: demo
+- Email: demo@give-aid.org
+- Password: Demo@123
 - Role: User
 
 **3 Causes:**
@@ -542,8 +544,8 @@ Total Lines: ~2,500+
 - 🗄️ **DB Schema:** Database/NGO_Database_ERD.md
 
 ### Test Accounts
-- **Admin:** admin@give-aid.org / Admin@123
-- **User:** user@example.com / User@123
+- **Admin:** admin / Admin@123 (email: admin@give-aid.org)
+- **User:** demo / Demo@123 (email: demo@give-aid.org)
 
 ### Useful Commands
 ```bash

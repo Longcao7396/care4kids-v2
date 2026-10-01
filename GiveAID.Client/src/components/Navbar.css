@@ -52,7 +52,6 @@
   display: inline-flex !important;
   align-items: center;
   justify-content: flex-start;
-  gap: 10px;
   font-family: var(--font-serif) !important;
   font-size: 1.25rem !important;     /* 20px, balanced with 76px bar */
   font-weight: 700 !important;
@@ -61,43 +60,21 @@
   text-decoration: none !important;
   letter-spacing: -0.01em;
   flex-shrink: 0;
-  height: 40px;                     /* match brand-icon box */
+  height: 40px;                     /* match logo height */
   margin-right: var(--space-6);     /* breathing room before menu */
 }
 
 .c4k-brand:hover,
 .c4k-brand:focus-visible {
-  color: var(--c4k-teal-dark) !important;
+  opacity: 0.85;
 }
 
-.c4k-brand-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  background-color: var(--c4k-coral-soft);
-  color: var(--c4k-coral);
-  border-radius: var(--radius-md);
-  flex-shrink: 0;
-}
-
-.c4k-brand-icon svg {
-  width: 20px;
-  height: 20px;
-}
-
-.c4k-brand-text {
-  display: inline-flex;
-  align-items: center;
-  /* Reset line-height so baseline matches icon */
-  line-height: 1.2;
-  white-space: nowrap;
-}
-
-.c4k-brand-accent {
-  color: var(--c4k-coral);
-  font-weight: 700;
+/* ── Brand Logo (SVG) ── */
+.c4k-brand-logo {
+  height: 48px;
+  width: auto;
+  display: block;
+  object-fit: contain;
 }
 
 /* ─── TOGGLER (mobile) ───────────────────────── */
@@ -116,14 +93,18 @@
 }
 
 /* ─── COLLAPSE (desktop single row) ─────────── */
+/* Scoped to desktop only: below 992px Bootstrap's own collapse
+   show/hide must stay in control of `display`. */
 
-.c4k-navbar .navbar-collapse {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  flex: 1 1 auto;
-  min-width: 0;
-  height: 100%;
+@media (min-width: 992px) {
+  .c4k-navbar .navbar-collapse {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 100%;
+  }
 }
 
 /* ─── NAV LIST ───────────────────────────────── */
@@ -473,26 +454,31 @@
 
   .c4k-brand {
     font-size: 1.125rem !important;
-    height: 36px;
+    height: auto;
     margin-right: var(--space-3);
   }
 
-  .c4k-brand-icon {
-    width: 36px;
-    height: 36px;
+  .c4k-brand-logo {
+    height: 42px;
   }
 
-  .c4k-brand-icon svg { width: 18px; height: 18px; }
-
-  .c4k-navbar-collapse {
+  /* Mobile drawer — anchored to the bottom edge of the fixed navbar.
+     `.c4k-navbar` is position:fixed, so it is the containing block. */
+  .c4k-navbar .navbar-collapse {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    width: 100%;
     background-color: var(--c4k-white);
     border-top: 1px solid var(--c4k-gray-200);
     margin-top: 0;
-    padding: var(--space-4) 0;
+    padding: var(--space-3) 0;
     box-shadow: var(--shadow-md);
-    display: block;             /* Bootstrap default stack */
-    flex: 0 0 auto;
-    height: auto;
+    /* Taller than the viewport → scroll inside the drawer, not the page */
+    max-height: calc(100vh - 64px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
 
   .c4k-nav-list {
@@ -547,5 +533,7 @@
     padding-right: var(--space-3);
   }
 
-  .c4k-brand-text { font-size: 1rem; }
+  .c4k-brand-logo {
+    height: 38px;
+  }
 }

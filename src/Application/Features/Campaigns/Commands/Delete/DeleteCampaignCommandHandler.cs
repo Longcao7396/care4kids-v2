@@ -1,3 +1,4 @@
+using GiveAID.Application.Services;
 using MediatR;
 
 namespace GiveAID.Application.Features.Campaigns.Commands.Delete;
@@ -8,10 +9,12 @@ namespace GiveAID.Application.Features.Campaigns.Commands.Delete;
 public class DeleteCampaignCommandHandler : IRequestHandler<DeleteCampaignCommand, bool>
 {
     private readonly IApplicationDbContext _context;
+    private readonly ICacheService _cacheService;
 
-    public DeleteCampaignCommandHandler(IApplicationDbContext context)
+    public DeleteCampaignCommandHandler(IApplicationDbContext context, ICacheService cacheService)
     {
         _context = context;
+        _cacheService = cacheService;
     }
 
     public async Task<bool> Handle(DeleteCampaignCommand request, CancellationToken cancellationToken)
@@ -26,6 +29,8 @@ public class DeleteCampaignCommandHandler : IRequestHandler<DeleteCampaignComman
         campaign.IsDeleted = true;
         campaign.DeletedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync(cancellationToken);
+
+        _cacheService.InvalidateStatistics();
 
         return true;
     }

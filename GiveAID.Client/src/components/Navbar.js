@@ -8,7 +8,7 @@ import './Navbar.css';
    NAVBAR — Care4Kids
    Dropdown menu:
     • Normal user            → USER menu only (Dashboard, My Donations, etc.)
-    • Admin / SuperAdmin     → ADMIN menu only (no personal-account items)
+    • Admin                  → ADMIN menu only (no personal-account items)
    All route protection is handled by ProtectedRoute + backend JWT.
    ═══════════════════════════════════════════════════════════════ */
 
@@ -96,12 +96,11 @@ const Navbar = () => {
 
         {/* Brand */}
         <BsNavbar.Brand as={Link} to="/" className="c4k-brand">
-          <span className="c4k-brand-icon" aria-hidden="true">
-            <Icon name="heart" size={20} />
-          </span>
-          <span className="c4k-brand-text">
-            Care<span className="c4k-brand-accent">4</span>Kids
-          </span>
+          <img 
+            src="/images/branding/Care4Kids_logo_clean.svg" 
+            alt="Care4Kids" 
+            className="c4k-brand-logo"
+          />
         </BsNavbar.Brand>
 
         <BsNavbar.Toggle aria-controls="c4k-nav" className="c4k-toggler" />
@@ -147,7 +146,7 @@ const Navbar = () => {
                     </>
                   )}
 
-                  {/* ── ADMIN SECTION (only for Admin / SuperAdmin) ── */}
+                  {/* ── ADMIN SECTION (only for Admin) ── */}
                   {admin && (
                     <>
                       <Divider />
@@ -169,7 +168,6 @@ const Navbar = () => {
                       <SectionHeader label="CONTENT" />
                       <MenuItem to="/admin/gallery" icon="image" label="Gallery Management" />
                       <MenuItem to="/admin/achievements" icon="award" label="Achievements" />
-                      <MenuItem to="/admin/about" icon="info" label="About Us Management" />
                       <MenuItem to="/admin/contacts" icon="mail" label="Contact Management" />
                       <MenuItem to="/admin/cms" icon="file-text" label="Content Management" />
 

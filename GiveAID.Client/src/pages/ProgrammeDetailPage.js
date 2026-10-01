@@ -29,9 +29,7 @@ const ProgrammeDetailPage = () => {
     try {
       setLoading(true);
       const response = await campaignsService.getById(id);
-      if (response.success) {
-        setEvent(response.data);
-      }
+      setEvent(response || null);
     } catch (error) {
       console.error('Error loading event:', error);
       setError('Failed to load event details');
@@ -54,13 +52,11 @@ const ProgrammeDetailPage = () => {
     setSuccess('');
 
     try {
-      const response = await campaignsService.register(id, {});
-      if (response.success) {
-        setSuccess('Successfully registered for this event!');
-        loadEvent(); // refresh participant count
-      }
+      await campaignsService.register(id, {});
+      setSuccess('Successfully registered for this event!');
+      loadEvent(); // refresh participant count
     } catch (err) {
-      setError(err.response?.data?.message || 'Registration failed');
+      setError(err.response?.data?.message || err.message || 'Registration failed');
     } finally {
       setRegistering(false);
     }

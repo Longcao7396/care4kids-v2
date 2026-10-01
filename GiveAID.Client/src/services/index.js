@@ -7,15 +7,16 @@ import { API_ENDPOINTS, STORAGE_KEYS } from '../config';
 export const authService = {
   register: async (userData) => {
     const response = await api.post(API_ENDPOINTS.AUTH.REGISTER, userData);
-    return response.data;
+    return response;
   },
   login: async (credentials) => {
     const response = await api.post(API_ENDPOINTS.AUTH.LOGIN, credentials);
-    if (response.data.success && response.data.data) {
-      localStorage.setItem(STORAGE_KEYS.TOKEN, response.data.data.token);
-      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(response.data.data.user));
+    if (response && response.token) {
+      localStorage.setItem(STORAGE_KEYS.TOKEN, response.token);
+      const { token, ...user } = response;
+      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
     }
-    return response.data;
+    return response;
   },
   logout: async () => {
     try {
@@ -27,7 +28,7 @@ export const authService = {
   },
   getCurrentUser: async () => {
     const response = await api.get(API_ENDPOINTS.AUTH.ME);
-    return response.data;
+    return response;
   },
   isAuthenticated: () => !!localStorage.getItem(STORAGE_KEYS.TOKEN),
   getStoredUser: () => {
@@ -41,42 +42,34 @@ export const authService = {
 // =====================================================
 export const causesService = {
   getAll: async (activeOnly = true, params = {}) => {
-    const response = await api.get(API_ENDPOINTS.CAUSES.LIST, {
+    return await api.get(API_ENDPOINTS.CAUSES.LIST, {
       params: { activeOnly, ...params }
     });
-    return response.data;
   },
   getTree: async (activeOnly = true) => {
-    const response = await api.get(API_ENDPOINTS.CAUSES.TREE, {
+    return await api.get(API_ENDPOINTS.CAUSES.TREE, {
       params: { activeOnly }
     });
-    return response.data;
   },
   getSubCauses: async (parentId, activeOnly = true) => {
-    const response = await api.get(`/causes/${parentId}/sub-causes`, {
+    return await api.get(`/causes/${parentId}/sub-causes`, {
       params: { activeOnly }
     });
-    return response.data;
   },
   getById: async (id) => {
-    const response = await api.get(API_ENDPOINTS.CAUSES.DETAIL(id));
-    return response.data;
+    return await api.get(API_ENDPOINTS.CAUSES.DETAIL(id));
   },
   create: async (data) => {
-    const response = await api.post(API_ENDPOINTS.CAUSES.CREATE, data);
-    return response.data;
+    return await api.post(API_ENDPOINTS.CAUSES.CREATE, data);
   },
   update: async (id, data) => {
-    const response = await api.put(API_ENDPOINTS.CAUSES.UPDATE(id), data);
-    return response.data;
+    return await api.put(API_ENDPOINTS.CAUSES.UPDATE(id), data);
   },
   remove: async (id) => {
-    const response = await api.delete(API_ENDPOINTS.CAUSES.DELETE(id));
-    return response.data;
+    return await api.delete(API_ENDPOINTS.CAUSES.DELETE(id));
   },
   getStats: async () => {
-    const response = await api.get(API_ENDPOINTS.CAUSES.STATS);
-    return response.data;
+    return await api.get(API_ENDPOINTS.CAUSES.STATS);
   },
 };
 
@@ -85,20 +78,16 @@ export const causesService = {
 // =====================================================
 export const donationsService = {
   getAll: async (params = {}) => {
-    const response = await api.get(API_ENDPOINTS.DONATIONS.LIST, { params });
-    return response.data;
+    return await api.get(API_ENDPOINTS.DONATIONS.LIST, { params });
   },
   getById: async (id) => {
-    const response = await api.get(API_ENDPOINTS.DONATIONS.DETAIL(id));
-    return response.data;
+    return await api.get(API_ENDPOINTS.DONATIONS.DETAIL(id));
   },
   create: async (data) => {
-    const response = await api.post(API_ENDPOINTS.DONATIONS.CREATE, data);
-    return response.data;
+    return await api.post(API_ENDPOINTS.DONATIONS.CREATE, data);
   },
   getStats: async () => {
-    const response = await api.get(API_ENDPOINTS.DONATIONS.STATS);
-    return response.data;
+    return await api.get(API_ENDPOINTS.DONATIONS.STATS);
   },
 };
 
@@ -112,41 +101,33 @@ export const donationsService = {
 // with any code that hasn't been migrated yet.
 export const campaignsService = {
   getAll: async (params = {}) => {
-    const response = await api.get(API_ENDPOINTS.CAMPAIGNS.LIST, { params });
-    return response.data;
+    return await api.get(API_ENDPOINTS.CAMPAIGNS.LIST, { params });
   },
   getById: async (id) => {
-    const response = await api.get(API_ENDPOINTS.CAMPAIGNS.DETAIL(id));
-    return response.data;
+    return await api.get(API_ENDPOINTS.CAMPAIGNS.DETAIL(id));
   },
   create: async (data) => {
-    const response = await api.post(API_ENDPOINTS.CAMPAIGNS.CREATE, data);
-    return response.data;
+    return await api.post(API_ENDPOINTS.CAMPAIGNS.CREATE, data);
   },
   update: async (id, data) => {
-    const response = await api.put(API_ENDPOINTS.CAMPAIGNS.UPDATE(id), data);
-    return response.data;
+    return await api.put(API_ENDPOINTS.CAMPAIGNS.UPDATE(id), data);
   },
   remove: async (id) => {
     const response = await api.delete(API_ENDPOINTS.CAMPAIGNS.DELETE(id));
-    return response.data;
+    return response;
   },
   getFeatured: async (count = 3) => {
-    const response = await api.get(API_ENDPOINTS.CAMPAIGNS.FEATURED, { params: { count } });
-    return response.data;
+    return await api.get(API_ENDPOINTS.CAMPAIGNS.FEATURED, { params: { count } });
   },
   // Unified registration endpoint (replaces /api/programmes/{id}/register)
   register: async (id, data) => {
-    const response = await api.post(API_ENDPOINTS.CAMPAIGNS.REGISTER(id), data);
-    return response.data;
+    return await api.post(API_ENDPOINTS.CAMPAIGNS.REGISTER(id), data);
   },
   getRegistrations: async (id) => {
-    const response = await api.get(API_ENDPOINTS.CAMPAIGNS.REGISTRATIONS(id));
-    return response.data;
+    return await api.get(API_ENDPOINTS.CAMPAIGNS.REGISTRATIONS(id));
   },
   getMyRegistrations: async () => {
-    const response = await api.get(API_ENDPOINTS.CAMPAIGNS.MY_REGISTRATIONS);
-    return response.data;
+    return await api.get(API_ENDPOINTS.CAMPAIGNS.MY_REGISTRATIONS);
   },
 };
 
@@ -155,20 +136,16 @@ export const campaignsService = {
 export const programmesService = {
   getAll: async (params = {}) => {
     const merged = { eventsOnly: true, ...params };
-    const response = await api.get(API_ENDPOINTS.CAMPAIGNS.LIST, { params: merged });
-    return response.data;
+    return await api.get(API_ENDPOINTS.CAMPAIGNS.LIST, { params: merged });
   },
   getById: async (id) => {
-    const response = await api.get(API_ENDPOINTS.CAMPAIGNS.DETAIL(id));
-    return response.data;
+    return await api.get(API_ENDPOINTS.CAMPAIGNS.DETAIL(id));
   },
   register: async (id, data) => {
-    const response = await api.post(API_ENDPOINTS.CAMPAIGNS.REGISTER(id), data);
-    return response.data;
+    return await api.post(API_ENDPOINTS.CAMPAIGNS.REGISTER(id), data);
   },
   getMyRegistrations: async () => {
-    const response = await api.get(API_ENDPOINTS.CAMPAIGNS.MY_REGISTRATIONS);
-    return response.data;
+    return await api.get(API_ENDPOINTS.CAMPAIGNS.MY_REGISTRATIONS);
   },
 };
 
@@ -178,125 +155,98 @@ export const programmesService = {
 
 export const teamService = {
   getAll: async (params = {}) => {
-    const response = await api.get(API_ENDPOINTS.TEAM.LIST, { params });
-    return response.data;
+    return await api.get(API_ENDPOINTS.TEAM.LIST, { params });
   },
   getById: async (id) => {
-    const response = await api.get(API_ENDPOINTS.TEAM.DETAIL(id));
-    return response.data;
+    return await api.get(API_ENDPOINTS.TEAM.DETAIL(id));
   },
   create: async (data) => {
-    const response = await api.post(API_ENDPOINTS.TEAM.CREATE, data);
-    return response.data;
+    return await api.post(API_ENDPOINTS.TEAM.CREATE, data);
   },
   update: async (id, data) => {
-    const response = await api.put(API_ENDPOINTS.TEAM.UPDATE(id), data);
-    return response.data;
+    return await api.put(API_ENDPOINTS.TEAM.UPDATE(id), data);
   },
   remove: async (id) => {
-    const response = await api.delete(API_ENDPOINTS.TEAM.DELETE(id));
-    return response.data;
+    return await api.delete(API_ENDPOINTS.TEAM.DELETE(id));
   },
 };
 
 export const achievementsService = {
   getAll: async (params = {}) => {
-    const response = await api.get(API_ENDPOINTS.ACHIEVEMENTS.LIST, { params });
-    return response.data;
+    return await api.get(API_ENDPOINTS.ACHIEVEMENTS.LIST, { params });
   },
   getStats: async () => {
-    const response = await api.get(API_ENDPOINTS.ACHIEVEMENTS.STATS);
-    return response.data;
+    return await api.get(API_ENDPOINTS.ACHIEVEMENTS.STATS);
   },
   getById: async (id) => {
-    const response = await api.get(API_ENDPOINTS.ACHIEVEMENTS.DETAIL(id));
-    return response.data;
+    return await api.get(API_ENDPOINTS.ACHIEVEMENTS.DETAIL(id));
   },
   create: async (data) => {
-    const response = await api.post(API_ENDPOINTS.ACHIEVEMENTS.CREATE, data);
-    return response.data;
+    return await api.post(API_ENDPOINTS.ACHIEVEMENTS.CREATE, data);
   },
   update: async (id, data) => {
-    const response = await api.put(API_ENDPOINTS.ACHIEVEMENTS.UPDATE(id), data);
-    return response.data;
+    return await api.put(API_ENDPOINTS.ACHIEVEMENTS.UPDATE(id), data);
   },
   remove: async (id) => {
-    const response = await api.delete(API_ENDPOINTS.ACHIEVEMENTS.DELETE(id));
-    return response.data;
+    return await api.delete(API_ENDPOINTS.ACHIEVEMENTS.DELETE(id));
   },
 };
 
 export const careersService = {
   getAll: async (params = {}) => {
-    const response = await api.get(API_ENDPOINTS.CAREERS.LIST, { params });
-    return response.data;
+    return await api.get(API_ENDPOINTS.CAREERS.LIST, { params });
   },
   getById: async (id) => {
-    const response = await api.get(API_ENDPOINTS.CAREERS.DETAIL(id));
-    return response.data;
+    return await api.get(API_ENDPOINTS.CAREERS.DETAIL(id));
   },
   apply: async (id, data) => {
-    const response = await api.post(API_ENDPOINTS.CAREERS.APPLY(id), data);
-    return response.data;
+    return await api.post(API_ENDPOINTS.CAREERS.APPLY(id), data);
   },
   getApplications: async (id) => {
-    const response = await api.get(API_ENDPOINTS.CAREERS.APPLICATIONS(id));
-    return response.data;
+    return await api.get(API_ENDPOINTS.CAREERS.APPLICATIONS(id));
   },
   create: async (data) => {
-    const response = await api.post(API_ENDPOINTS.CAREERS.CREATE, data);
-    return response.data;
+    return await api.post(API_ENDPOINTS.CAREERS.CREATE, data);
   },
   update: async (id, data) => {
-    const response = await api.put(API_ENDPOINTS.CAREERS.UPDATE(id), data);
-    return response.data;
+    return await api.put(API_ENDPOINTS.CAREERS.UPDATE(id), data);
   },
   remove: async (id) => {
-    const response = await api.delete(API_ENDPOINTS.CAREERS.DELETE(id));
-    return response.data;
+    return await api.delete(API_ENDPOINTS.CAREERS.DELETE(id));
   },
 };
 
 export const supportersService = {
   getAll: async (params = {}) => {
-    const response = await api.get(API_ENDPOINTS.SUPPORTERS.LIST, { params });
-    return response.data;
+    return await api.get(API_ENDPOINTS.SUPPORTERS.LIST, { params });
   },
   getStats: async () => {
-    const response = await api.get(API_ENDPOINTS.SUPPORTERS.STATS);
-    return response.data;
+    return await api.get(API_ENDPOINTS.SUPPORTERS.STATS);
   },
   getById: async (id) => {
-    const response = await api.get(API_ENDPOINTS.SUPPORTERS.DETAIL(id));
-    return response.data;
+    return await api.get(API_ENDPOINTS.SUPPORTERS.DETAIL(id));
   },
   create: async (data) => {
-    const response = await api.post(API_ENDPOINTS.SUPPORTERS.CREATE, data);
-    return response.data;
+    return await api.post(API_ENDPOINTS.SUPPORTERS.CREATE, data);
   },
   update: async (id, data) => {
-    const response = await api.put(API_ENDPOINTS.SUPPORTERS.UPDATE(id), data);
-    return response.data;
+    return await api.put(API_ENDPOINTS.SUPPORTERS.UPDATE(id), data);
   },
   remove: async (id) => {
-    const response = await api.delete(API_ENDPOINTS.SUPPORTERS.DELETE(id));
-    return response.data;
+    return await api.delete(API_ENDPOINTS.SUPPORTERS.DELETE(id));
   },
 };
 
 export const cmsService = {
   getPages: async (keys) => {
     const params = keys ? { keys: Array.isArray(keys) ? keys.join(',') : keys } : {};
-    const response = await api.get(API_ENDPOINTS.CMS.PAGES, { params });
-    return response.data;
+    return await api.get(API_ENDPOINTS.CMS.PAGES, { params });
   },
   getByKey: async (key) => {
-    const response = await api.get(API_ENDPOINTS.CMS.PAGE_BY_KEY(key));
-    return response.data;
+    return await api.get(API_ENDPOINTS.CMS.PAGE_BY_KEY(key));
   },
   updatePage: async (id, data) => {
-    const response = await api.put(API_ENDPOINTS.CMS.UPDATE_PAGE(id), data);
-    return response.data;
+    return await api.put(API_ENDPOINTS.CMS.UPDATE_PAGE(id), data);
   },
 };
 
@@ -306,91 +256,71 @@ export const cmsService = {
 
 export const faqService = {
   getAll: async (params = {}) => {
-    const response = await api.get(API_ENDPOINTS.FAQS.LIST, { params });
-    return response.data;
+    return await api.get(API_ENDPOINTS.FAQS.LIST, { params });
   },
   getCategories: async () => {
-    const response = await api.get(API_ENDPOINTS.FAQS.CATEGORIES);
-    return response.data;
+    return await api.get(API_ENDPOINTS.FAQS.CATEGORIES);
   },
   getById: async (id) => {
-    const response = await api.get(API_ENDPOINTS.FAQS.DETAIL(id));
-    return response.data;
+    return await api.get(API_ENDPOINTS.FAQS.DETAIL(id));
   },
   create: async (data) => {
-    const response = await api.post(API_ENDPOINTS.FAQS.CREATE, data);
-    return response.data;
+    return await api.post(API_ENDPOINTS.FAQS.CREATE, data);
   },
   update: async (id, data) => {
-    const response = await api.put(API_ENDPOINTS.FAQS.UPDATE(id), data);
-    return response.data;
+    return await api.put(API_ENDPOINTS.FAQS.UPDATE(id), data);
   },
   remove: async (id) => {
-    const response = await api.delete(API_ENDPOINTS.FAQS.DELETE(id));
-    return response.data;
+    return await api.delete(API_ENDPOINTS.FAQS.DELETE(id));
   },
 };
 
 export const contactService = {
   submit: async (data) => {
-    const response = await api.post(API_ENDPOINTS.CONTACTS.SUBMIT, data);
-    return response.data;
+    return await api.post(API_ENDPOINTS.CONTACTS.SUBMIT, data);
   },
   // Admin-only
   getAll: async (params = {}) => {
-    const response = await api.get(API_ENDPOINTS.CONTACTS.LIST, { params });
-    return response.data;
+    return await api.get(API_ENDPOINTS.CONTACTS.LIST, { params });
   },
   getById: async (id) => {
-    const response = await api.get(API_ENDPOINTS.CONTACTS.DETAIL(id));
-    return response.data;
+    return await api.get(API_ENDPOINTS.CONTACTS.DETAIL(id));
   },
   reply: async (id, data) => {
-    const response = await api.put(API_ENDPOINTS.CONTACTS.REPLY(id), data);
-    return response.data;
+    return await api.put(API_ENDPOINTS.CONTACTS.REPLY(id), data);
   },
   toggleRead: async (id) => {
-    const response = await api.put(API_ENDPOINTS.CONTACTS.READ(id));
-    return response.data;
+    return await api.put(API_ENDPOINTS.CONTACTS.READ(id));
   },
   remove: async (id) => {
-    const response = await api.delete(API_ENDPOINTS.CONTACTS.DELETE(id));
-    return response.data;
+    return await api.delete(API_ENDPOINTS.CONTACTS.DELETE(id));
   },
   getStats: async () => {
-    const response = await api.get(API_ENDPOINTS.CONTACTS.STATS);
-    return response.data;
+    return await api.get(API_ENDPOINTS.CONTACTS.STATS);
   },
 };
 
 export const galleryService = {
   getAll: async (params = {}) => {
-    const response = await api.get(API_ENDPOINTS.GALLERY.LIST, { params });
-    return response.data;
+    return await api.get(API_ENDPOINTS.GALLERY.LIST, { params });
   },
   getCategories: async () => {
-    const response = await api.get(API_ENDPOINTS.GALLERY.CATEGORIES);
-    return response.data;
+    return await api.get(API_ENDPOINTS.GALLERY.CATEGORIES);
   },
   getProgrammes: async () => {
-    const response = await api.get(API_ENDPOINTS.GALLERY.PROGRAMMES);
-    return response.data;
+    return await api.get(API_ENDPOINTS.GALLERY.PROGRAMMES);
   },
   getById: async (id) => {
-    const response = await api.get(API_ENDPOINTS.GALLERY.DETAIL(id));
-    return response.data;
+    return await api.get(API_ENDPOINTS.GALLERY.DETAIL(id));
   },
   create: async (data) => {
-    const response = await api.post(API_ENDPOINTS.GALLERY.CREATE, data);
-    return response.data;
+    return await api.post(API_ENDPOINTS.GALLERY.CREATE, data);
   },
   update: async (id, data) => {
-    const response = await api.put(API_ENDPOINTS.GALLERY.UPDATE(id), data);
-    return response.data;
+    return await api.put(API_ENDPOINTS.GALLERY.UPDATE(id), data);
   },
   remove: async (id) => {
-    const response = await api.delete(API_ENDPOINTS.GALLERY.DELETE(id));
-    return response.data;
+    return await api.delete(API_ENDPOINTS.GALLERY.DELETE(id));
   },
 
   // ── Multipart upload (Cloudinary via server) ────────────────────────
@@ -406,23 +336,21 @@ export const galleryService = {
   // The formData blob is built by the caller (typically ImageUpload.js
   // -> AdminGalleryPage.js passes {imageFile, ...otherFields}).
   uploadFile: async (formData) => {
-    const response = await api.post(API_ENDPOINTS.GALLERY.UPLOAD, formData, {
+    return await api.post(API_ENDPOINTS.GALLERY.UPLOAD, formData, {
       headers: { 'Content-Type': undefined }, // axios auto-sets multipart with boundary
       // Long-ish timeout — admin uploads from slow connections need more time
       // than the default 30s. Server request size limit is 5 MB.
       timeout: 60000,
     });
-    return response.data;
   },
 
   // Used when REPLACING an existing gallery image. Marks the file replacement
   // on the server so the old Cloudinary file is deleted.
   uploadFileReplace: async (id, formData) => {
-    const response = await api.put(API_ENDPOINTS.GALLERY.UPLOAD_UPDATE(id), formData, {
+    return await api.put(API_ENDPOINTS.GALLERY.UPLOAD_UPDATE(id), formData, {
       headers: { 'Content-Type': undefined },
       timeout: 60000,
     });
-    return response.data;
   },
 };
 
@@ -431,25 +359,20 @@ export const galleryService = {
 // =====================================================
 export const invitationsService = {
   send: async (data) => {
-    const response = await api.post(API_ENDPOINTS.INVITATIONS.SEND, data);
-    return response.data;
+    return await api.post(API_ENDPOINTS.INVITATIONS.SEND, data);
   },
   getMine: async () => {
-    const response = await api.get(API_ENDPOINTS.INVITATIONS.MINE);
-    return response.data;
+    return await api.get(API_ENDPOINTS.INVITATIONS.MINE);
   },
   // Admin
   getAll: async (params = {}) => {
-    const response = await api.get(API_ENDPOINTS.INVITATIONS.LIST, { params });
-    return response.data;
+    return await api.get(API_ENDPOINTS.INVITATIONS.LIST, { params });
   },
   getStats: async () => {
-    const response = await api.get(API_ENDPOINTS.INVITATIONS.STATS);
-    return response.data;
+    return await api.get(API_ENDPOINTS.INVITATIONS.STATS);
   },
   cancel: async (id) => {
-    const response = await api.post(API_ENDPOINTS.INVITATIONS.CANCEL(id));
-    return response.data;
+    return await api.post(API_ENDPOINTS.INVITATIONS.CANCEL(id));
   },
 };
 
@@ -459,37 +382,29 @@ export const invitationsService = {
 export const conversationsService = {
   // User
   create: async (data) => {
-    const response = await api.post(API_ENDPOINTS.CONVERSATIONS.CREATE, data);
-    return response.data;
+    return await api.post(API_ENDPOINTS.CONVERSATIONS.CREATE, data);
   },
   getMine: async (params = {}) => {
-    const response = await api.get(API_ENDPOINTS.CONVERSATIONS.MINE, { params });
-    return response.data;
+    return await api.get(API_ENDPOINTS.CONVERSATIONS.MINE, { params });
   },
   addMessage: async (id, data) => {
-    const response = await api.post(API_ENDPOINTS.CONVERSATIONS.MESSAGES(id), data);
-    return response.data;
+    return await api.post(API_ENDPOINTS.CONVERSATIONS.MESSAGES(id), data);
   },
   close: async (id) => {
-    const response = await api.post(API_ENDPOINTS.CONVERSATIONS.CLOSE(id));
-    return response.data;
+    return await api.post(API_ENDPOINTS.CONVERSATIONS.CLOSE(id));
   },
   // Admin
   getAll: async (params = {}) => {
-    const response = await api.get(API_ENDPOINTS.CONVERSATIONS.LIST, { params });
-    return response.data;
+    return await api.get(API_ENDPOINTS.CONVERSATIONS.LIST, { params });
   },
   getById: async (id) => {
-    const response = await api.get(API_ENDPOINTS.CONVERSATIONS.DETAIL(id));
-    return response.data;
+    return await api.get(API_ENDPOINTS.CONVERSATIONS.DETAIL(id));
   },
   getStats: async () => {
-    const response = await api.get(API_ENDPOINTS.CONVERSATIONS.STATS);
-    return response.data;
+    return await api.get(API_ENDPOINTS.CONVERSATIONS.STATS);
   },
   assign: async (id, data) => {
-    const response = await api.post(API_ENDPOINTS.CONVERSATIONS.ASSIGN(id), data);
-    return response.data;
+    return await api.post(API_ENDPOINTS.CONVERSATIONS.ASSIGN(id), data);
   },
 };
 

@@ -14,12 +14,11 @@ const Footer = () => {
             {/* Col 1: Brand + Mission + Social */}
             <Col lg={4} md={6} className="c4k-footer-col">
               <Link to="/" className="c4k-footer-brand">
-                <span className="c4k-footer-brand-icon" aria-hidden="true">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-                  </svg>
-                </span>
-                Care<span className="c4k-brand-accent">4</span>Kids
+                <img 
+                  src="/images/branding/Care4Kids_logo_clean.svg" 
+                  alt="Care4Kids" 
+                  className="c4k-footer-brand-logo"
+                />
               </Link>
               <p className="c4k-footer-mission">
                 We provide vulnerable children with food, education, healthcare and safe homes — building a future where every child can thrive.

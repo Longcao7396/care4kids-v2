@@ -1,3 +1,4 @@
+using GiveAID.Application.Services;
 using MediatR;
 
 namespace GiveAID.Application.Features.Users.Commands.DeactivateUser;
@@ -8,10 +9,12 @@ namespace GiveAID.Application.Features.Users.Commands.DeactivateUser;
 public class DeactivateUserCommandHandler : IRequestHandler<DeactivateUserCommand, bool>
 {
     private readonly IApplicationDbContext _context;
+    private readonly ICacheService _cacheService;
 
-    public DeactivateUserCommandHandler(IApplicationDbContext context)
+    public DeactivateUserCommandHandler(IApplicationDbContext context, ICacheService cacheService)
     {
         _context = context;
+        _cacheService = cacheService;
     }
 
     public async Task<bool> Handle(DeactivateUserCommand request, CancellationToken cancellationToken)
@@ -27,6 +30,8 @@ public class DeactivateUserCommandHandler : IRequestHandler<DeactivateUserComman
         user.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync(cancellationToken);
+
+        _cacheService.InvalidateStatistics();
 
         return true;
     }

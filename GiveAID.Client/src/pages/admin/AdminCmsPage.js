@@ -10,7 +10,6 @@ import SupportersAdmin from './SupportersAdmin';
 import CmsPagesAdmin from './CmsPagesAdmin';
 import AdminFaqManager from './AdminFaqManager';
 import AdminContactInfo from './AdminContactInfo';
-import AdminSiteSettings from './AdminSiteSettings';
 import '../../styles/AboutPages.css';
 
 const TABS = [
@@ -22,7 +21,6 @@ const TABS = [
   { key: 'faqs',         label: 'FAQs',              icon: 'bi-question-circle-fill' },
   { key: 'cms',          label: 'About Pages',       icon: 'bi-file-text-fill' },
   { key: 'contact',      label: 'Contact Info',      icon: 'bi-envelope-fill' },
-  { key: 'settings',     label: 'Site Settings',     icon: 'bi-gear-fill' },
 ];
 
 /* ── Overview Tab ────────────────────────────── */
@@ -53,7 +51,6 @@ function OverviewTab() {
               {tab.key === 'faqs' && 'Add / edit Help Centre FAQs'}
               {tab.key === 'cms' && 'Edit About Us main pages content'}
               {tab.key === 'contact' && 'Edit public contact information'}
-              {tab.key === 'settings' && 'Global site settings'}
             </div>
           </a>
         ))}
@@ -110,7 +107,7 @@ function OverviewTab() {
 /* ── Main Admin CMS Page ──────────────────────── */
 function AdminCmsPage() {
   const { user } = useAuth();
-  const canAccessAdmin = user?.role === 'Admin' || user?.role === 'SuperAdmin';
+  const canAccessAdmin = user?.role === 'Admin';
   const [activeTab, setActiveTab] = useState('overview');
 
   React.useEffect(() => {
@@ -145,7 +142,6 @@ function AdminCmsPage() {
           {activeTab === 'faqs' && <AdminFaqManager />}
           {activeTab === 'cms' && <CmsPagesAdmin />}
           {activeTab === 'contact' && <AdminContactInfo />}
-          {activeTab === 'settings' && <AdminSiteSettings />}
         </div>
 
       <style>{`

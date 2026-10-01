@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card, Alert, Button, Modal, Form, Spinner, Badge, InputGroup } from 'react-bootstrap';
 import api from '../../services/api';
+import { useAuth } from '../../contexts/AuthContext';
 import { sanitizeHtml } from '../../utils/safeHtml';
 
 /* ── Validation ────────────────────────────── */
@@ -50,7 +51,7 @@ export default function CmsPagesAdmin() {
     try {
       setLoading(true);
       const response = await api.get('/cms/pages', { params: { includeInactive: true } });
-      if (response.data.success) setPages(response.data.data || []);
+      setPages(Array.isArray(response) ? response : (response?.items || []));
     } catch (err) {
       setError('Failed to load CMS pages.');
     } finally {
@@ -82,17 +83,15 @@ export default function CmsPagesAdmin() {
       setSaving(true);
       try {
         setError(null);
-        const response = await api.put(`/cms/pages/${editing.pageId}`, {
+        await api.put(`/cms/pages/${editing.pageId}`, {
           pageTitle, content, metaDescription, metaKeywords,
           displayOrder, isInMenu, isActive,
         });
-        if (response.data.success) {
-          setSuccess('Page content saved.');
-          setEditing(null);
-          load();
-        }
+        setSuccess('Page content saved.');
+        setEditing(null);
+        load();
       } catch (err) {
-        setError('Save failed.');
+        setError(err.message || 'Save failed.');
       } finally {
         setSaving(false);
       }
@@ -107,14 +106,15 @@ export default function CmsPagesAdmin() {
       await api.delete(`/cms/pages/${deleteConfirm}`);
       setSuccess('Page deleted.');
     } catch (err) {
-      setError('Delete failed. (SuperAdmin required)');
+      setError('Delete failed. (Admin permission required.)');
     } finally {
       setDeleteConfirm(null);
       load();
     }
   };
 
-  const isSuperAdmin = JSON.parse(localStorage.getItem('giveaid_user') || '{}')?.role === 'SuperAdmin';
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'Admin';
 
   const filtered = pages.filter((p) => {
     const s = search.toLowerCase();
@@ -135,7 +135,7 @@ export default function CmsPagesAdmin() {
             Edit the HTML content shown on each About Us sub-page.
           </p>
         </div>
-        {isSuperAdmin && (
+        {isAdmin && (
           <Button variant="primary" onClick={openCreate}>
             <i className="bi bi-plus-circle me-2"></i>New Page
           </Button>
@@ -192,7 +192,7 @@ export default function CmsPagesAdmin() {
                   >
                     <i className="bi bi-pencil-square me-1"></i>Edit
                   </Button>
-                  {isSuperAdmin && (
+                  {isAdmin && (
                     <Button
                       variant="outline-danger"
                       size="sm"
@@ -405,14 +405,10 @@ function CreatePageModal({ show, onClose, onSuccess }) {
     if (Object.keys(errs).length) { setErrors(errs); return; }
     setSaving(true);
     try {
-      const response = await api.post('/cms/pages', form);
-      if (response.data.success) {
-        onSuccess();
-      } else {
-        setError(response.data.message || 'Create failed.');
-      }
+      await api.post('/cms/pages', form);
+      onSuccess();
     } catch (err) {
-      setError(err.response?.data?.message || 'Create failed.');
+      setError(err.message || 'Create failed.');
     } finally {
       setSaving(false);
     }

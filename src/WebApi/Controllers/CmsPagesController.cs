@@ -1,4 +1,5 @@
 using GiveAID.Application.Features.CmsPages.Commands.Create;
+using GiveAID.Application.Features.CmsPages.Commands.Delete;
 using GiveAID.Application.Features.CmsPages.Commands.Update;
 using GiveAID.Application.Features.CmsPages.DTOs;
 using GiveAID.Application.Features.CmsPages.Queries.GetAll;
@@ -27,14 +28,26 @@ public class CmsPagesController : ControllerBase
     }
 
     /// <summary>
-    /// Get all CMS pages. Pass ?keys=key1,key2 to filter by PageKey.
+    /// Get CMS pages. Public callers receive only active pages by default.
+    /// Admin callers pass <c>?includeInactive=true</c> to also see rows whose
+    /// <c>IsActive</c> flag is false (e.g. when editing / auditing).
+    /// Optionally filter by a comma-separated list of <see cref="CmsPage.PageKey"/>
+    /// values via <c>?keys=key1,key2</c>.
     /// </summary>
     [HttpGet("pages")]
     [AllowAnonymous]
     [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetPages([FromQuery] string? keys = null)
+    public async Task<IActionResult> GetPages(
+        [FromQuery] string? keys = null,
+        [FromQuery] bool includeInactive = false)
     {
-        var items = (await _mediator.Send(new GetAllCmsPagesQuery { ActiveOnly = false })).ToList();
+        // Canonical semantics:
+        //   includeInactive = true  -> return active + inactive (admin use)
+        //   includeInactive = false -> return only active (public use, default)
+        var items = (await _mediator.Send(new GetAllCmsPagesQuery
+        {
+            ActiveOnly = !includeInactive
+        })).ToList();
 
         if (!string.IsNullOrWhiteSpace(keys))
         {
@@ -49,8 +62,12 @@ public class CmsPagesController : ControllerBase
     }
 
     /// <summary>
-    /// Get a CMS page by PageKey or PageSlug. Tries slug first; falls back to
-    /// matching by PageKey so admin can store pages with either identifier.
+    /// Get a CMS page by PageKey or PageSlug for public rendering (About,
+    /// Contact, Privacy, Terms, etc.). Anonymous access; inactive rows are
+    /// hidden (the query handler always filters on <c>IsActive</c>) so
+    /// deactivated pages never leak to the public site.
+    /// Admin can still inspect inactive rows via
+    /// <c>GET /api/v1/cms/pages?includeInactive=true</c>.
     /// </summary>
     [HttpGet("pages/{keyOrSlug}")]
     [AllowAnonymous]
@@ -58,15 +75,16 @@ public class CmsPagesController : ControllerBase
     [ProducesResponseType(typeof(object), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetByKeyOrSlug(string keyOrSlug)
     {
-        // 1. Try by slug — use null check instead of catching InvalidOperationException
+        // 1. Try by slug — GetCmsPageBySlugQuery already filters IsActive.
         var bySlug = await _mediator.Send(new GetCmsPageBySlugQuery { Slug = keyOrSlug });
         if (bySlug != null)
         {
             return Ok(new { success = true, message = "OK", data = bySlug });
         }
 
-        // 2. Fallback: match by PageKey (case-insensitive)
-        var all = await _mediator.Send(new GetAllCmsPagesQuery { ActiveOnly = false });
+        // 2. Fallback: match by PageKey (case-insensitive). ActiveOnly = true
+        //    so deactivated rows are not exposed publicly.
+        var all = await _mediator.Send(new GetAllCmsPagesQuery { ActiveOnly = true });
         var byKey = all.FirstOrDefault(p =>
             string.Equals(p.PageKey, keyOrSlug, StringComparison.OrdinalIgnoreCase));
         if (byKey != null)
@@ -103,11 +121,14 @@ public class CmsPagesController : ControllerBase
 
     [HttpDelete("pages/{id:int}")]
     [Authorize(Policy = "RequireAdmin")]
-    [ProducesResponseType(typeof(object), StatusCodes.Status501NotImplemented)]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(object), StatusCodes.Status401Unauthorized)]
-    public IActionResult Delete(int id)
+    public async Task<IActionResult> Delete(int id)
     {
-        // Delete command not yet implemented in Application layer
-        return StatusCode(501, new { success = false, message = "Delete not yet implemented", data = (object?)null });
+        // Soft-delete: the base DbContext intercepts the Remove call and
+        // converts it to IsDeleted/DeletedAt so the row is hidden from all
+        // subsequent reads (global query filter) without losing audit data.
+        await _mediator.Send(new DeleteCmsPageCommand { PageId = id });
+        return Ok(new { success = true, message = "Page deleted", data = (object?)null });
     }
 }

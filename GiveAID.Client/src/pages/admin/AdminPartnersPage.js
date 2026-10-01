@@ -1,8 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  Container, Row, Col, Alert, Button,
-  Modal, Form, Spinner
-} from 'react-bootstrap';
+import { Modal, Button, Spinner } from 'react-bootstrap';
 import { supportersService } from '../../services';
 import { useAuth } from '../../contexts/AuthContext';
 import AdminPageFrame from '../../components/AdminPageFrame';
@@ -11,27 +8,32 @@ import '../admin/AdminForm.css';
 const TYPE_OPTIONS = [
   'Supporter', 'Partner', 'NGO', 'Corporate', 'Government', 'Other'
 ];
-const CONTRIBUTION_TYPES = ['Financial', 'In-Kind', 'Volunteering', 'Sponsorship', 'Other'];
+const CONTRIBUTION_TYPES = [
+  '', 'Cash', 'In-kind', 'Cash + In-kind', 'Volunteer hours',
+  'Technical assistance', 'Sponsorship', 'Cash + Technology', 'Other'
+];
 
 /* ── Validation ───────────────────────────────────── */
-function validate(data) {
+function validate(data, isUpdate = false) {
   const errs = {};
   if (!data.organizationName?.trim())
     errs.organizationName = 'Organization name is required.';
   if (!data.organizationType?.trim())
     errs.organizationType = 'Organization type is required.';
   if (data.contactEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.contactEmail))
-    errs.contactEmail = 'Invalid email address.';
-  if (data.websiteUrl && !/^https?:\/\/.+/.test(data.websiteUrl))
+    errs.contactEmail = 'Enter a valid email address.';
+  if (data.websiteUrl && !/^https?:\/\/.+/i.test(data.websiteUrl))
     errs.websiteUrl = 'Website must start with http:// or https://';
   if (data.contributionAmount && isNaN(Number(data.contributionAmount)))
-    errs.contributionAmount = 'Contribution amount must be a number.';
+    errs.contributionAmount = 'Must be a valid number.';
+  if (data.displayOrder && isNaN(Number(data.displayOrder)))
+    errs.displayOrder = 'Must be a valid integer.';
   return errs;
 }
 
 const EMPTY_FORM = {
   organizationName: '',
-  organizationType: 'Supporter',
+  organizationType: 'NGO',
   description: '',
   logoUrl: '',
   websiteUrl: '',
@@ -43,10 +45,63 @@ const EMPTY_FORM = {
   vision: '',
   contributionAmount: '',
   contributionType: '',
+  displayOrder: 0,
   isActive: true,
   isFeatured: false,
-  displayOrder: 0,
 };
+
+/* ── Form field helpers ────────────────────────────── */
+function Field({
+  label, required, error, hint, children, full,
+}) {
+  return (
+    <div className={`af-field ${full ? 'af-field-full' : ''}`}>
+      <label className="af-label">
+        {label}
+        {required && <span className="af-required" aria-hidden="true">*</span>}
+      </label>
+      {children}
+      {hint && !error && <div className="af-hint">{hint}</div>}
+      {error && <div className="af-error" role="alert">{error}</div>}
+    </div>
+  );
+}
+
+function TextInput({ value, onChange, invalid, ...rest }) {
+  return (
+    <input
+      className={`af-input ${invalid ? 'is-invalid' : ''}`}
+      value={value ?? ''}
+      onChange={onChange}
+      {...rest}
+    />
+  );
+}
+
+function TextArea({ value, onChange, invalid, rows = 3, ...rest }) {
+  return (
+    <textarea
+      className={`af-textarea ${invalid ? 'is-invalid' : ''}`}
+      value={value ?? ''}
+      onChange={onChange}
+      rows={rows}
+      {...rest}
+    />
+  );
+}
+
+function SelectInput({ value, onChange, invalid, children, ...rest }) {
+  return (
+    <select
+      className={`af-select ${invalid ? 'is-invalid' : ''}`}
+      value={value ?? ''}
+      onChange={onChange}
+      {...rest}
+    >
+      {children}
+    </select>
+  );
+}
 
 /* ── Partner Form Modal ────────────────────────────── */
 function PartnerFormModal({ show, editing, initial, onSave, onClose }) {
@@ -56,193 +111,583 @@ function PartnerFormModal({ show, editing, initial, onSave, onClose }) {
 
   useEffect(() => {
     if (show) {
-      setForm(editing ? { ...initial, contributionAmount: initial.contributionAmount ?? '' } : EMPTY_FORM);
+      setForm(
+        editing
+          ? {
+              ...EMPTY_FORM,
+              ...initial,
+              contributionAmount:
+                initial.contributionAmount === null ||
+                initial.contributionAmount === undefined
+                  ? ''
+                  : String(initial.contributionAmount),
+              displayOrder: initial.displayOrder ?? 0,
+            }
+          : EMPTY_FORM
+      );
       setErrors({});
     }
   }, [show, editing, initial]);
 
-  const set = (field) => (e) =>
-    setForm((f) => ({ ...f, [field]: e.target.value }));
+  const set = useCallback(
+    (field) => (e) => {
+      const v = e?.target ? e.target.value : e;
+      setForm((f) => ({ ...f, [field]: v }));
+      setErrors((prev) => ({ ...prev, [field]: undefined }));
+    },
+    []
+  );
 
-  const setBool = (field) => (e) =>
-    setForm((f) => ({ ...f, [field]: e.target.checked }));
+  const toggle = useCallback(
+    (field) => (e) => {
+      const v = e?.target ? e.target.checked : !!e;
+      setForm((f) => ({ ...f, [field]: v }));
+    },
+    []
+  );
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const errs = validate(form);
-    if (Object.keys(errs).length) { setErrors(errs); return; }
+    const errs = validate(form, !!editing);
+    if (Object.keys(errs).length) {
+      setErrors(errs);
+      return;
+    }
     setSaving(true);
     try {
       const payload = {
         ...form,
-        contributionAmount: form.contributionAmount ? parseFloat(form.contributionAmount) : null,
-        displayOrder: parseInt(form.displayOrder) || 0,
+        organizationName: form.organizationName.trim(),
+        organizationType: form.organizationType.trim(),
+        contributionAmount:
+          form.contributionAmount === '' || form.contributionAmount === null
+            ? null
+            : parseFloat(form.contributionAmount),
+        displayOrder: parseInt(form.displayOrder, 10) || 0,
       };
       await onSave(payload);
+    } catch (err) {
+      // Surface server validation errors back to the form.
+      const msg = err?.message || 'Could not save the partner. Please try again.';
+      setErrors((prev) => ({ ...prev, _form: msg }));
     } finally {
       setSaving(false);
     }
   };
 
-  const fieldGroup = (label, field, as = 'input', rows = 3) => (
-    <Form.Group className="mb-3" controlId={`form-${field}`}>
-      <Form.Label>{label}</Form.Label>
-      {as === 'textarea' ? (
-        <Form.Control
-          as="textarea"
-          rows={rows}
-          value={form[field]}
-          onChange={set(field)}
-          isInvalid={!!errors[field]}
-        />
-      ) : (
-        <Form.Control
-          type={as === 'input' ? 'text' : as}
-          value={form[field]}
-          onChange={set(field)}
-          isInvalid={!!errors[field]}
-        />
-      )}
-      {errors[field] && (
-        <Form.Control.Feedback type="invalid">{errors[field]}</Form.Control.Feedback>
-      )}
-    </Form.Group>
-  );
-
   return (
-    <Modal show={show} onHide={onClose} size="lg" centered className="admin-modal-dark">
+    <Modal
+      show={show}
+      onHide={onClose}
+      centered
+      scrollable
+      size="lg"
+      className="af-form-modal partner-form-modal"
+      backdrop="static"
+      aria-labelledby="partner-form-title"
+    >
+      {/* ───── Header ───── */}
       <Modal.Header closeButton>
-        <Modal.Title>
-          <i className={`bi ${editing ? 'bi-pencil-square' : 'bi-plus-circle'} me-2 text-accent`}></i>
-          {editing ? 'Edit Partner' : 'Add New Partner'}
-        </Modal.Title>
+        <div className="partner-form-header">
+          <div className="partner-form-header-icon" aria-hidden="true">
+            <i className={`bi ${editing ? 'bi-pencil-square' : 'bi-plus-circle'}`}></i>
+          </div>
+          <div>
+            <Modal.Title id="partner-form-title">
+              {editing ? 'Edit Partner' : 'Add New Partner'}
+            </Modal.Title>
+            <p className="partner-form-header-sub">
+              {editing
+                ? 'Update this organization’s information shown on the public Our Partners page.'
+                : 'Add an organization to display on the Our Partners page.'}
+            </p>
+          </div>
+        </div>
       </Modal.Header>
-      <Form onSubmit={handleSubmit}>
+
+      <form onSubmit={handleSubmit} noValidate>
+        {/* ───── Body ───── */}
         <Modal.Body>
-          <Row>
-            <Col md={8}>
-              {fieldGroup('Organization Name *', 'organizationName')}
-            </Col>
-            <Col md={4}>
-              <Form.Group className="mb-3" controlId="form-type">
-                <Form.Label>Organization Type *</Form.Label>
-                <Form.Select value={form.organizationType} onChange={set('organizationType')}
-                  isInvalid={!!errors.organizationType}>
-                  {TYPE_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
-                </Form.Select>
-                {errors.organizationType && (
-                  <Form.Control.Feedback type="invalid">{errors.organizationType}</Form.Control.Feedback>
-                )}
-              </Form.Group>
-            </Col>
-          </Row>
+          {errors._form && (
+            <div className="af-banner af-banner-error mb-3" role="alert">
+              <span>{errors._form}</span>
+            </div>
+          )}
 
-          {fieldGroup('Description', 'description', 'textarea', 3)}
-          {fieldGroup('Logo URL', 'logoUrl')}
-          <Row>
-            <Col md={6}>{fieldGroup('Website URL', 'websiteUrl')}</Col>
-            <Col md={6}>{fieldGroup('Registration Number', 'registrationNumber')}</Col>
-          </Row>
-          <Row>
-            <Col md={6}>{fieldGroup('Contact Email', 'contactEmail', 'email')}</Col>
-            <Col md={6}>{fieldGroup('Contact Phone', 'contactPhone')}</Col>
-          </Row>
-          {fieldGroup('Address', 'address')}
-          <Row>
-            <Col md={6}>{fieldGroup('Mission', 'mission', 'textarea', 2)}</Col>
-            <Col md={6}>{fieldGroup('Vision', 'vision', 'textarea', 2)}</Col>
-          </Row>
-          <Row>
-            <Col md={4}>
-              {fieldGroup('Contribution Amount (VND)', 'contributionAmount', 'number')}
-            </Col>
-            <Col md={4}>
-              <Form.Group className="mb-3" controlId="form-contrib-type">
-                <Form.Label>Contribution Type</Form.Label>
-                <Form.Select value={form.contributionType} onChange={set('contributionType')}>
-                  <option value="">— Select —</option>
-                  {CONTRIBUTION_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-                </Form.Select>
-              </Form.Group>
-            </Col>
-            <Col md={4}>
-              {fieldGroup('Display Order', 'displayOrder', 'number')}
-            </Col>
-          </Row>
+          {/* SECTION 1 — Organization Information */}
+          <section className="partner-form-section" aria-labelledby="sec-org-info">
+            <header className="partner-form-section-header">
+              <h6 id="sec-org-info" className="partner-form-section-title">
+                <i className="bi bi-buildings" aria-hidden="true"></i>
+                Organization Information
+              </h6>
+              <span className="partner-form-section-meta">Required details about the partner</span>
+            </header>
 
-          <Row className="mt-2">
-            <Col md={4}>
-              <Form.Check
-                type="switch"
-                id="is-active"
-                label="Active"
-                checked={form.isActive}
-                onChange={setBool('isActive')}
+            <div className="af-field-row">
+              <Field
+                label="Organization Name"
+                required
+                error={errors.organizationName}
+                full
+              >
+                <TextInput
+                  type="text"
+                  value={form.organizationName}
+                  onChange={set('organizationName')}
+                  invalid={!!errors.organizationName}
+                  placeholder="e.g. UNICEF Vietnam"
+                  autoFocus
+                  maxLength={150}
+                />
+              </Field>
+
+              <Field label="Organization Type" required error={errors.organizationType}>
+                <SelectInput
+                  value={form.organizationType}
+                  onChange={set('organizationType')}
+                  invalid={!!errors.organizationType}
+                >
+                  {TYPE_OPTIONS.map((t) => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </SelectInput>
+              </Field>
+            </div>
+
+            <Field
+              label="Description"
+              hint="A short summary of the organization’s mission and activities."
+              full
+            >
+              <TextArea
+                value={form.description}
+                onChange={set('description')}
+                rows={3}
+                placeholder="Brief description shown on the partner card and detail view."
+                maxLength={2000}
               />
-            </Col>
-            <Col md={4}>
-              <Form.Check
-                type="switch"
-                id="is-featured"
-                label="Featured"
-                checked={form.isFeatured}
-                onChange={setBool('isFeatured')}
-              />
-            </Col>
-          </Row>
+            </Field>
+          </section>
+
+          {/* SECTION 2 — Contact & Online Presence */}
+          <section className="partner-form-section" aria-labelledby="sec-contact">
+            <header className="partner-form-section-header">
+              <h6 id="sec-contact" className="partner-form-section-title">
+                <i className="bi bi-globe2" aria-hidden="true"></i>
+                Contact &amp; Online Presence
+              </h6>
+              <span className="partner-form-section-meta">How people reach the organization</span>
+            </header>
+
+            <div className="af-field-row">
+              <Field label="Logo URL" hint="Square logo works best (PNG, JPG, or SVG).">
+                <TextInput
+                  type="url"
+                  value={form.logoUrl}
+                  onChange={set('logoUrl')}
+                  placeholder="https://example.org/logo.png"
+                  maxLength={255}
+                />
+              </Field>
+
+              <Field label="Website URL" error={errors.websiteUrl}>
+                <TextInput
+                  type="url"
+                  value={form.websiteUrl}
+                  onChange={set('websiteUrl')}
+                  invalid={!!errors.websiteUrl}
+                  placeholder="https://example.org"
+                  maxLength={200}
+                />
+              </Field>
+
+              <Field label="Contact Email" error={errors.contactEmail}>
+                <TextInput
+                  type="email"
+                  value={form.contactEmail}
+                  onChange={set('contactEmail')}
+                  invalid={!!errors.contactEmail}
+                  placeholder="contact@example.org"
+                  maxLength={100}
+                />
+              </Field>
+
+              <Field label="Contact Phone" hint="Include country code, e.g. +84 …">
+                <TextInput
+                  type="tel"
+                  value={form.contactPhone}
+                  onChange={set('contactPhone')}
+                  placeholder="+84 24 0000 0000"
+                  maxLength={20}
+                />
+              </Field>
+
+              <Field label="Registration Number" hint="Official legal/charity registration ID, if any.">
+                <TextInput
+                  type="text"
+                  value={form.registrationNumber}
+                  onChange={set('registrationNumber')}
+                  placeholder="REG-XXXXXX"
+                  maxLength={50}
+                />
+              </Field>
+
+              <Field label="Address" hint="Street, district, city.">
+                <TextInput
+                  type="text"
+                  value={form.address}
+                  onChange={set('address')}
+                  placeholder="123 Street, District, City"
+                  maxLength={255}
+                />
+              </Field>
+            </div>
+          </section>
+
+          {/* SECTION 3 — Organization Profile */}
+          <section className="partner-form-section" aria-labelledby="sec-profile">
+            <header className="partner-form-section-header">
+              <h6 id="sec-profile" className="partner-form-section-title">
+                <i className="bi bi-card-text" aria-hidden="true"></i>
+                Organization Profile
+              </h6>
+              <span className="partner-form-section-meta">Long-form context for the detail modal</span>
+            </header>
+
+            <div className="af-field-row">
+              <Field label="Mission" full>
+                <TextArea
+                  value={form.mission}
+                  onChange={set('mission')}
+                  rows={3}
+                  placeholder="The organization’s mission statement."
+                  maxLength={500}
+                />
+              </Field>
+
+              <Field label="Vision" full>
+                <TextArea
+                  value={form.vision}
+                  onChange={set('vision')}
+                  rows={3}
+                  placeholder="The organization’s vision statement."
+                  maxLength={500}
+                />
+              </Field>
+            </div>
+          </section>
+
+          {/* SECTION 4 — Partnership Details */}
+          <section className="partner-form-section" aria-labelledby="sec-partnership">
+            <header className="partner-form-section-header">
+              <h6 id="sec-partnership" className="partner-form-section-title">
+                <i className="bi bi-cash-stack" aria-hidden="true"></i>
+                Partnership Details
+              </h6>
+              <span className="partner-form-section-meta">Visible to admins; contribution stats power the public page</span>
+            </header>
+
+            <div className="af-field-row">
+              <Field
+                label="Contribution Amount (VND)"
+                error={errors.contributionAmount}
+                hint="Numeric value in Vietnamese đồng (VND)."
+              >
+                <TextInput
+                  type="number"
+                  inputMode="numeric"
+                  min="0"
+                  step="1000"
+                  value={form.contributionAmount}
+                  onChange={set('contributionAmount')}
+                  invalid={!!errors.contributionAmount}
+                  placeholder="10000000"
+                />
+              </Field>
+
+              <Field label="Contribution Type">
+                <SelectInput
+                  value={form.contributionType}
+                  onChange={set('contributionType')}
+                >
+                  {CONTRIBUTION_TYPES.map((t) => (
+                    <option key={t || 'none'} value={t}>{t || '— Select —'}</option>
+                  ))}
+                </SelectInput>
+              </Field>
+
+              <Field
+                label="Display Order"
+                error={errors.displayOrder}
+                hint="Lower numbers appear first on the public page."
+              >
+                <TextInput
+                  type="number"
+                  inputMode="numeric"
+                  min="0"
+                  step="1"
+                  value={form.displayOrder}
+                  onChange={set('displayOrder')}
+                  invalid={!!errors.displayOrder}
+                  placeholder="0"
+                />
+              </Field>
+
+              <div className="af-field">
+                <label className="af-label">Visibility</label>
+                <div className="partner-form-toggles">
+                  <label className="af-checkbox-row" htmlFor="is-active">
+                    <input
+                      id="is-active"
+                      type="checkbox"
+                      checked={!!form.isActive}
+                      onChange={toggle('isActive')}
+                    />
+                    <span>
+                      <strong>Active</strong>
+                      <small className="partner-form-toggle-hint">
+                        Shown on the public Our Partners page when on.
+                      </small>
+                    </span>
+                  </label>
+
+                  <label className="af-checkbox-row" htmlFor="is-featured">
+                    <input
+                      id="is-featured"
+                      type="checkbox"
+                      checked={!!form.isFeatured}
+                      onChange={toggle('isFeatured')}
+                    />
+                    <span>
+                      <strong>Featured</strong>
+                      <small className="partner-form-toggle-hint">
+                        Highlighted in the public page header summary.
+                      </small>
+                    </span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </section>
         </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={onClose} disabled={saving}>Cancel</Button>
-          <Button variant="primary" type="submit" disabled={saving}>
-            {saving ? (
-              <><Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" className="me-2" />
-              Saving...</>
-            ) : (
-              <><i className={`bi ${editing ? 'bi-check-circle' : 'bi-plus-circle'} me-2`}></i>
-              {editing ? 'Update Partner' : 'Add Partner'}</>
-            )}
-          </Button>
+
+        {/* ───── Footer ───── */}
+        <Modal.Footer className="partner-form-footer">
+          <span className="partner-form-footer-hint">
+            <i className="bi bi-info-circle" aria-hidden="true"></i>
+            Changes apply to both the admin table and the public Our Partners page.
+          </span>
+          <div className="partner-form-footer-actions">
+            <button
+              type="button"
+              className="af-btn af-btn-secondary"
+              onClick={onClose}
+              disabled={saving}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="af-btn af-btn-primary"
+              disabled={saving}
+            >
+              {saving ? (
+                <>
+                  <Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" />
+                  <span>{editing ? 'Saving…' : 'Adding…'}</span>
+                </>
+              ) : (
+                <>
+                  <i className={`bi ${editing ? 'bi-check-circle' : 'bi-plus-circle'}`} aria-hidden="true"></i>
+                  <span>{editing ? 'Save Changes' : 'Add Partner'}</span>
+                </>
+              )}
+            </button>
+          </div>
         </Modal.Footer>
-      </Form>
+      </form>
 
       <style>{`
-        .admin-modal-dark .modal-content {
-          background: var(--bg-card);
-          border: 1px solid var(--border-slate);
-          color: var(--text-light);
+        /* ==========================================================
+           Partner form — overrides to align with the af-form-modal
+           design system used by all admin CRUD pages.
+           ========================================================== */
+        .partner-form-modal .modal-content {
+          border: 0;
+          border-radius: 16px;
+          box-shadow: 0 24px 60px rgba(15, 23, 42, 0.22);
+          overflow: hidden;
         }
-        .admin-modal-dark .modal-header {
-          border-bottom: 1px solid var(--border-slate);
-          background: rgba(56,189,248,0.04);
+
+        /* Header */
+        .partner-form-modal .modal-header {
+          padding: 22px 26px 18px;
+          border-bottom: 1px solid var(--c4k-gray-100, #F3F4F6);
+          background: linear-gradient(180deg, #FAFBFC 0%, #FFFFFF 100%);
+          align-items: flex-start;
         }
-        .admin-modal-dark .modal-footer {
-          border-top: 1px solid var(--border-slate);
+        .partner-form-modal .modal-header .btn-close {
+          margin-top: 6px;
         }
-        .admin-modal-dark .btn-close {
-          filter: invert(1);
-          opacity: 0.5;
+        .partner-form-header {
+          display: flex;
+          align-items: flex-start;
+          gap: 14px;
+          width: 100%;
         }
-        .admin-modal-dark .form-label {
-          color: var(--text-light);
+        .partner-form-header-icon {
+          flex-shrink: 0;
+          width: 40px;
+          height: 40px;
+          border-radius: 10px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          background: linear-gradient(135deg, rgba(14,116,144,0.10), rgba(231,111,81,0.10));
+          color: var(--c4k-teal-dark, #0A5C73);
+          font-size: 1.15rem;
+        }
+        .partner-form-modal .modal-title {
+          font-family: var(--font-serif, Georgia, serif);
+          font-size: 1.25rem;
+          font-weight: 700;
+          color: var(--c4k-charcoal, #1A1A1A);
+          letter-spacing: -0.02em;
+          line-height: 1.25;
+          margin: 0;
+        }
+        .partner-form-header-sub {
+          margin: 4px 0 0;
+          font-size: 0.8125rem;
+          color: var(--c4k-gray-600, #4B5563);
+          line-height: 1.45;
+          max-width: 64ch;
+        }
+
+        /* Body */
+        .partner-form-modal .modal-body {
+          padding: 22px 26px 8px;
+        }
+
+        /* Sections */
+        .partner-form-section {
+          padding: 18px 0 22px;
+          border-bottom: 1px dashed var(--c4k-gray-200, #E5E7EB);
+        }
+        .partner-form-section:first-child { padding-top: 4px; }
+        .partner-form-section:last-of-type { border-bottom: 0; padding-bottom: 4px; }
+
+        .partner-form-section-header {
+          display: flex;
+          align-items: baseline;
+          flex-wrap: wrap;
+          gap: 10px;
+          margin-bottom: 14px;
+        }
+        .partner-form-section-title {
+          font-size: 0.6875rem;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.12em;
+          color: var(--c4k-teal-dark, #0A5C73);
+          margin: 0;
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+        }
+        .partner-form-section-title i {
+          font-size: 0.95rem;
+          color: var(--c4k-coral, #E76F51);
+        }
+        .partner-form-section-meta {
+          font-size: 0.75rem;
+          color: var(--c4k-gray-500, #6B7280);
+        }
+
+        /* Field grid: 2 columns desktop, 1 column mobile */
+        .partner-form-section .af-field-row {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 14px 16px;
+        }
+        .partner-form-section .af-field-row > .af-field-full {
+          grid-column: 1 / -1;
+        }
+        @media (max-width: 575px) {
+          .partner-form-section .af-field-row { grid-template-columns: 1fr; }
+        }
+
+        /* Inline error state on inputs */
+        .partner-form-modal .af-input.is-invalid,
+        .partner-form-modal .af-textarea.is-invalid,
+        .partner-form-modal .af-select.is-invalid {
+          border-color: var(--c4k-danger, #B91C1C);
+          box-shadow: 0 0 0 3px rgba(185, 28, 28, 0.10);
+        }
+
+        /* Toggles */
+        .partner-form-toggles {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 10px;
+        }
+        @media (max-width: 575px) {
+          .partner-form-toggles { grid-template-columns: 1fr; }
+        }
+        .partner-form-toggles .af-checkbox-row {
+          flex-direction: row;
+          align-items: flex-start;
+          gap: 12px;
+          padding: 12px 14px;
+        }
+        .partner-form-toggles .af-checkbox-row input {
+          margin-top: 2px;
+          width: 16px;
+          height: 16px;
+        }
+        .partner-form-toggles .af-checkbox-row span {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
           font-size: 0.875rem;
-          font-weight: 600;
         }
-        .admin-modal-dark .form-control,
-        .admin-modal-dark .form-select {
-          background: var(--primary-slate);
-          border: 1px solid var(--border-slate);
-          color: var(--text-light);
+        .partner-form-toggle-hint {
+          font-size: 0.75rem;
+          color: var(--c4k-gray-500, #6B7280);
+          font-weight: 400;
         }
-        .admin-modal-dark .form-control:focus,
-        .admin-modal-dark .form-select:focus {
-          border-color: var(--accent-sky);
-          box-shadow: 0 0 0 3px rgba(56,189,248,0.15);
-          background: var(--primary-slate);
-          color: var(--text-light);
+
+        /* Footer */
+        .partner-form-footer {
+          padding: 16px 26px 20px;
+          border-top: 1px solid var(--c4k-gray-100, #F3F4F6);
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 14px;
+          flex-wrap: wrap;
         }
-        .admin-modal-dark .form-control.is-invalid,
-        .admin-modal-dark .form-select.is-invalid {
-          border-color: #EF4444;
+        .partner-form-footer-hint {
+          font-size: 0.75rem;
+          color: var(--c4k-gray-500, #6B7280);
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+        }
+        .partner-form-footer-actions {
+          display: inline-flex;
+          gap: 10px;
+          flex-shrink: 0;
+        }
+
+        @media (max-width: 575px) {
+          .partner-form-footer {
+            flex-direction: column-reverse;
+            align-items: stretch;
+          }
+          .partner-form-footer-actions { width: 100%; }
+          .partner-form-footer-actions .af-btn { flex: 1; }
         }
       `}</style>
     </Modal>
@@ -252,11 +697,12 @@ function PartnerFormModal({ show, editing, initial, onSave, onClose }) {
 /* ── Admin Partners Page ───────────────────────────── */
 function AdminPartnersPage() {
   const { user } = useAuth();
-  const canAccess = user?.role === 'Admin' || user?.role === 'SuperAdmin';
+  const canAccess = user?.role === 'Admin';
 
   const [partners, setPartners] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null); // null = add, else edit
   const [search, setSearch] = useState('');
@@ -270,7 +716,7 @@ function AdminPartnersPage() {
       setError(null);
       const params = { activeOnly: false };
       const response = await supportersService.getAll(params);
-      if (response.success) setPartners(response.data || []);
+      setPartners(Array.isArray(response) ? response : (response?.items || []));
     } catch {
       setError('Failed to load partners.');
     } finally {
@@ -286,24 +732,42 @@ function AdminPartnersPage() {
   const openEdit = (p) => { setEditing(p); setShowForm(true); };
 
   const handleSave = async (payload) => {
-    if (editing) {
-      await supportersService.update(editing.organizationId, payload);
-    } else {
-      await supportersService.create(payload);
+    try {
+      if (editing) {
+        await supportersService.update(editing.organizationId, payload);
+        setSuccess('Partner updated successfully.');
+      } else {
+        await supportersService.create(payload);
+        setSuccess('Partner added successfully.');
+      }
+      setShowForm(false);
+      setError(null);
+      await fetchPartners();
+    } catch (err) {
+      // Re-throw so the modal can display the inline error.
+      throw err;
     }
-    setShowForm(false);
-    fetchPartners();
   };
 
   const handleDelete = async () => {
     if (!deleteConfirm) return;
     try {
       await supportersService.remove(deleteConfirm);
+      setSuccess('Partner deactivated.');
+    } catch (err) {
+      setError('Failed to deactivate partner.');
     } finally {
       setDeleteConfirm(null);
       fetchPartners();
     }
   };
+
+  // Auto-dismiss success banner.
+  useEffect(() => {
+    if (!success) return undefined;
+    const t = setTimeout(() => setSuccess(null), 4000);
+    return () => clearTimeout(t);
+  }, [success]);
 
   const getInitials = (name) => {
     if (!name) return '?';
@@ -325,9 +789,11 @@ function AdminPartnersPage() {
 
   if (!canAccess) {
     return (
-      <Container className="py-5">
-        <Alert variant="danger">You do not have permission to access this page.</Alert>
-      </Container>
+      <AdminPageFrame title="Partner management">
+        <div className="af-banner af-banner-error" role="alert">
+          <span>You do not have permission to access this page.</span>
+        </div>
+      </AdminPageFrame>
     );
   }
 
@@ -337,6 +803,7 @@ function AdminPartnersPage() {
       title="Partner management"
       sub="Manage partner organizations displayed on the Our Partners page."
       error={error}
+      success={success}
       actions={
         <button type="button" className="af-btn af-btn-primary" onClick={openAdd}>
           <i className="bi bi-plus-circle" aria-hidden="true"></i>
@@ -482,7 +949,7 @@ function AdminPartnersPage() {
                         <button type="button" className="af-icon-btn" onClick={() => openEdit(p)} title="Edit" aria-label="Edit">
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                         </button>
-                        {user?.role === 'SuperAdmin' && (
+                        {user?.role === 'Admin' && (
                           <button type="button" className="af-icon-btn danger" onClick={() => setDeleteConfirm(p.organizationId)} title="Deactivate" aria-label="Deactivate">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>
                           </button>
@@ -507,20 +974,34 @@ function AdminPartnersPage() {
       />
 
       {/* Delete Confirm */}
-      <Modal show={!!deleteConfirm} onHide={() => setDeleteConfirm(null)} centered className="admin-modal-dark">
-        <Modal.Header closeButton>
-          <Modal.Title>
-            <i className="bi bi-exclamation-triangle-fill text-danger me-2"></i>
-            Deactivate Partner
-          </Modal.Title>
-        </Modal.Header>
+      <Modal
+        show={!!deleteConfirm}
+        onHide={() => setDeleteConfirm(null)}
+        centered
+        className="af-confirm-modal"
+      >
         <Modal.Body>
-          Are you sure you want to deactivate this partner? They will no longer appear
-          on the public Our Partners page. Linked donations will be preserved.
+          <div className="af-confirm-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+          </div>
+          <h3 className="af-confirm-title">Deactivate partner?</h3>
+          <p className="af-confirm-text">
+            This organization will no longer appear on the public Our Partners
+            page. Linked campaigns and donations are preserved and the record
+            can be reactivated later.
+          </p>
         </Modal.Body>
         <Modal.Footer>
-          <Button variant="secondary" onClick={() => setDeleteConfirm(null)}>Cancel</Button>
-          <Button variant="danger" onClick={handleDelete}>Deactivate</Button>
+          <button type="button" className="af-btn af-btn-secondary" onClick={() => setDeleteConfirm(null)}>
+            Cancel
+          </button>
+          <button type="button" className="af-btn af-btn-danger" onClick={handleDelete}>
+            <i className="bi bi-trash" aria-hidden="true"></i>
+            <span>Deactivate</span>
+          </button>
         </Modal.Footer>
       </Modal>
     </AdminPageFrame>

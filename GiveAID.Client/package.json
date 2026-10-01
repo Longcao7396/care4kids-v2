@@ -4,6 +4,8 @@
   "description": "Give-AID NGO Website - React Frontend (v2 Clean Architecture)",
   "private": true,
   "dependencies": {
+    "@babel/core": "^7.29.7",
+    "@babel/parser": "^7.29.9",
     "@testing-library/jest-dom": "^5.17.0",
     "@testing-library/react": "^13.4.0",
     "@testing-library/user-event": "^13.5.0",

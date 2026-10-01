@@ -273,7 +273,7 @@ function OrgDetailModal({ org, onClose }) {
 /* ── Admin NGO Page ─────────────────────────── */
 export default function AdminNgoPage() {
   const { user } = useAuth();
-  const canAccess = user?.role === 'Admin' || user?.role === 'SuperAdmin';
+  const canAccess = user?.role === 'Admin';
 
   const [items, setItems] = useState([]);
   const [stats, setStats] = useState(null);
@@ -293,7 +293,8 @@ export default function AdminNgoPage() {
       setLoading(true);
       setError(null);
       const res = await api.get('/organizations');
-      if (res.data.success) setItems(res.data.data?.items || res.data.data || []);
+      // res can be array or { items }
+      setItems(Array.isArray(res) ? res : (res.items || []));
     } catch {
       setError('Failed to load organizations.');
     } finally {
@@ -304,7 +305,7 @@ export default function AdminNgoPage() {
   const fetchStats = useCallback(async () => {
     try {
       const res = await api.get('/organizations/stats');
-      if (res.data.success) setStats(res.data.data);
+      if (res) setStats(res);
     } catch { /* non-fatal */ }
   }, []);
 
@@ -317,8 +318,8 @@ export default function AdminNgoPage() {
   const openDetail = (item) => {
     setDetailOrg(item);
     api.get(`/organizations/${item.organizationId}`).then((res) => {
-      if (res.data.success) setDetailOrg(res.data.data);
-    });
+      setDetailOrg(res);
+    }).catch(() => {});
   };
 
   const handleSave = async (payload) => {
@@ -354,7 +355,7 @@ export default function AdminNgoPage() {
     const matchType = !typeFilter || o.organizationType === typeFilter;
     const matchStatus = !statusFilter ||
       (statusFilter === 'active' && o.isActive) ||
-      (statusFilter === 'statusFilter' && !o.isActive);
+      (statusFilter === 'inactive' && !o.isActive);
     return matchSearch && matchType && matchStatus;
   });
 
@@ -519,7 +520,7 @@ export default function AdminNgoPage() {
                     <Button variant="outline-primary" size="sm" onClick={() => openEdit(o)} title="Edit">
                       <i className="bi bi-pencil"></i>
                     </Button>
-                    {user?.role === 'SuperAdmin' && (
+                    {user?.role === 'Admin' && (
                       <Button variant="outline-danger" size="sm"
                         onClick={() => setDeleteConfirm(o.organizationId)} title="Deactivate">
                         <i className="bi bi-trash"></i>

@@ -1,17 +1,38 @@
-// Gallery images for the Impact Gallery page.
-// Each item maps to one of the categories you specified and is tagged with
-// a layout intent so the Gallery component can pick the right aspect ratio:
-//   - 'wide'   : 16:9 hero / featured image
-//   - 'tall'   : 4:5 portrait close-up
-//   - 'square' : 1:1 thumbnail
+// Gallery categories — UI metadata only.
 //
-// Source policy:
-//   - All URLs are Cloudinary-hosted (`res.cloudinary.com/mczqcagv`).
-//   - Each item carries `publicId` so the AdminGalleryPage Cloudinary preview
-//     can render the asset even when the API is unreachable.
-//   - Duplicates inside this fallback dataset have been removed (g-007 vs g-020,
-//     g-003 vs g-016). Reuse of the same image as a DB row is acceptable because
-//     this fallback only renders when /api/v1/gallery is offline.
+// IMPORTANT (Oct 1, 2026): The actual gallery images are NOT loaded from
+// this file anymore. The single source of truth is the backend's
+// /api/v1/gallery endpoint, which reads from the `gallery` SQL table.
+//
+// The same records are now shared between Admin Gallery (CMS management)
+// and Public Gallery (gallery page) — both call the same API and see the
+// same data.
+//
+// This file is retained for two reasons only:
+//   1. `GALLERY_CATEGORIES` — provides icon + display label for each
+//      canonical category id (used by the public filter tabs).
+//   2. `GALLERY_IMAGES`    — DEPRECATED hardcoded fallback array. Kept
+//      exported only for offline / development use. It is NEVER mixed with
+//      real database records in production data flow.
+//
+// The GALLERY_IMAGES content below was recovered from git history
+// (commit c13391f — "refactor: update React frontend - pages, components,
+// and services") and represents the previous English-language gallery
+// presentation. These 20 well-curated items use Cloudinary-hosted URLs
+// and English titles such as:
+//   - Mountain Classrooms — Knowledge for the Highlands
+//   - Central Vietnam Flood Relief — Standing With Our Communities
+//   - Everyday Joy at the Care Home
+//   - Mobile Health Checkups in Remote Villages
+//   - Reading Hour at the Village Library
+//   - Measles Vaccination Drive
+//   - Clean Water Wells for Mountain Villages
+//   - Charity Run — Steps for Children
+//   - Voices for Children Benefit Concert
+//   - … and 11 more
+// They serve as a documentation / development reference for the old
+// English gallery copy. The Public Gallery page does NOT read from this
+// array at runtime — it fetches /api/v1/gallery instead.
 
 export const GALLERY_CATEGORIES = [
   { id: 'all',         label: 'All Stories',  icon: 'gallery' },
@@ -25,8 +46,18 @@ export const GALLERY_CATEGORIES = [
   { id: 'events',      label: 'Events',       icon: 'event' },
 ];
 
+// DEPRECATED: Hardcoded fallback dataset, no longer used by production data flow.
+// Public Gallery fetches live records from /api/v1/gallery.
+// Admin Gallery performs real CRUD against the same endpoint.
+//
+// Source policy (recovered from commit c13391f):
+//   - All URLs are Cloudinary-hosted (`res.cloudinary.com/mczqcagv`).
+//   - Each item carries `publicId` so the AdminGalleryPage Cloudinary preview
+//     can render the asset even when the API is unreachable.
+//   - Layouts are tagged as 'wide' (16:9 hero), 'tall' (4:5 portrait),
+//     or 'square' (1:1 thumbnail) to drive the masonry layout.
 export const GALLERY_IMAGES = [
-  // ─── WIDE / HERO ─────────────────────────────────────────
+  // ─── WIDE / HERO ──────────────────────────────────────────────
   {
     id: 'g-001',
     url: 'https://res.cloudinary.com/mczqcagv/image/upload/v1790337357/giveaid/replacement/thieunhi9-2869-1401513005_chlpkd.webp',
@@ -50,7 +81,7 @@ export const GALLERY_IMAGES = [
     alt: 'Disaster relief aid distribution in a flood-affected village',
   },
 
-  // ─── TALL / PORTRAIT ─────────────────────────────────────
+  // ─── TALL / PORTRAIT ─────────────────────────────────────────
   {
     id: 'g-003',
     url: 'https://res.cloudinary.com/mczqcagv/image/upload/v1790337417/giveaid/replacement/6.2-1_emufuw.jpg',
@@ -96,7 +127,7 @@ export const GALLERY_IMAGES = [
     alt: 'Child vaccination at a rural clinic',
   },
 
-  // ─── SQUARE / STANDARD ──────────────────────────────────
+  // ─── SQUARE / STANDARD ───────────────────────────────────────
   {
     id: 'g-007',
     url: 'https://res.cloudinary.com/mczqcagv/image/upload/v1790337412/giveaid/replacement/thieunhi-6226-1401513004_dqjcpq.webp',
@@ -164,7 +195,7 @@ export const GALLERY_IMAGES = [
     alt: 'Caregivers supporting children at a community shelter',
   },
 
-  // ─── MORE PORTRAITS / CANDID ────────────────────────────
+  // ─── MORE PORTRAITS / CANDID ────────────────────────────────
   {
     id: 'g-013',
     url: 'https://res.cloudinary.com/mczqcagv/image/upload/v1790337414/giveaid/replacement/senh1-7468-1396341888_qrbxq7.webp',

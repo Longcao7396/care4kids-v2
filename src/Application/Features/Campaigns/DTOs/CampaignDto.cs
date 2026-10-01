@@ -31,7 +31,7 @@ public class CampaignDto
     public string Status { get; set; } = string.Empty;
     public bool IsFeatured { get; set; }
     public int DisplayOrder { get; set; }
-    public int? CreatedBy { get; set; }
+    public string? CreatedBy { get; set; }
     public DateTime CreatedAt { get; set; }
     public int DonorCount { get; set; }
 }

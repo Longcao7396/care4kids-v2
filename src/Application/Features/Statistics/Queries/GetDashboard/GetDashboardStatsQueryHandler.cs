@@ -42,8 +42,8 @@ public class GetDashboardStatsQueryHandler : IRequestHandler<GetDashboardStatsQu
         var donationsThisMonth = await completedDonations.CountAsync(d => d.DonationDate >= startOfMonth, cancellationToken);
 
         var totalDonors = await _context.Donations
-            .Where(d => d.PaymentStatus == "Completed")
-            .Select(d => d.UserId)
+            .Where(d => d.PaymentStatus == "Completed" && d.UserId != null)
+            .Select(d => d.UserId!.Value)
             .Distinct()
             .CountAsync(cancellationToken);
 
@@ -97,6 +97,64 @@ public class GetDashboardStatsQueryHandler : IRequestHandler<GetDashboardStatsQu
             });
         }
 
+        // ── Step 1: recentUsers ──────────────────────────────────────────────
+        // Global query filter on User is already active (HasQueryFilter u => !u.IsDeleted)
+        // so soft-deleted users are excluded automatically. Take 10 most-recently created.
+        var recentUsers = await _context.Users
+            .OrderByDescending(u => u.CreatedAt)
+            .Take(10)
+            .Select(u => new RecentUserDto
+            {
+                UserId = u.UserId,
+                FullName = u.FullName,
+                Email = u.Email,
+                CreatedAt = u.CreatedAt
+            })
+            .ToListAsync(cancellationToken);
+
+        // ── Step 2: donationsByCampaign ────────────────────────────────────────
+        // Aggregate completed donations that have a CampaignId, GROUP BY CampaignId.
+        // Reuse the existing completedDonations IQueryable.
+        // For donor count: count distinct UserId values; use default-if-null so NULL
+        // user_ids (anonymous donations) don't collapse all anonymous donors into one row.
+        var donationsByCampaign = await completedDonations
+            .Where(d => d.CampaignId != null)
+            .GroupBy(d => new { d.CampaignId, d.Campaign!.CampaignName, d.Campaign.GoalAmount, d.Campaign.RaisedAmount, CauseName = d.Campaign.Cause!.CauseName })
+            .OrderByDescending(g => g.Sum(d => d.Amount))
+            .Take(10)
+            .Select(g => new CampaignStatsDto
+            {
+                CampaignId = g.Key.CampaignId!.Value,
+                CampaignName = g.Key.CampaignName,
+                CauseName = g.Key.CauseName,
+                DonorCount = g.Where(d => d.UserId != null).Select(d => d.UserId!.Value).Distinct().Count(),
+                RaisedAmount = g.Sum(d => d.Amount),
+                GoalAmount = g.Key.GoalAmount,
+                PercentageReached = g.Key.GoalAmount > 0
+                    ? Math.Min(Math.Round(g.Sum(d => d.Amount) * 100m / g.Key.GoalAmount, 2), 100m)
+                    : 0m
+            })
+            .ToListAsync(cancellationToken);
+
+        // ── Step 3: donationsByCause ──────────────────────────────────────────
+        // Donation.CauseId is non-nullable — direct path, no need to go via Campaign.
+        // Only include causes that have at least one completed donation.
+        // Compute: raisedAmount (sum of completed donations), donationCount, targetAmount.
+        var donationsByCause = await completedDonations
+            .GroupBy(d => new { d.CauseId, d.Cause!.CauseName, d.Cause.CauseCode, d.Cause.TargetAmount })
+            .OrderByDescending(g => g.Sum(d => d.Amount))
+            .Take(10)
+            .Select(g => new DashboardCauseStatsDto
+            {
+                CauseId = g.Key.CauseId,
+                CauseName = g.Key.CauseName,
+                CauseCode = g.Key.CauseCode,
+                RaisedAmount = g.Sum(d => d.Amount),
+                TargetAmount = g.Key.TargetAmount,
+                DonationCount = g.Count()
+            })
+            .ToListAsync(cancellationToken);
+
         var stats = new DashboardStatsDto
         {
             TotalDonations = totalRaised,
@@ -110,7 +168,10 @@ public class GetDashboardStatsQueryHandler : IRequestHandler<GetDashboardStatsQu
             DonationsToday = donationsToday,
             DonationsThisMonth = donationsThisMonth,
             RecentDonations = recentDonations,
-            DonationsByMonth = donationsByMonth
+            DonationsByMonth = donationsByMonth,
+            RecentUsers = recentUsers,
+            DonationsByCampaign = donationsByCampaign,
+            DonationsByCause = donationsByCause
         };
 
         _cacheService.Set(cacheKey, stats, TimeSpan.FromMinutes(5));

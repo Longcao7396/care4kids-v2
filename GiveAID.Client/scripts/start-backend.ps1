@@ -1,46 +1,58 @@
 # start-backend.ps1 — Build & run GiveAID v2 WebApi on port 5231.
 # Logs to scripts/backend.log, writes PID to scripts/backend.pid.
-# Auto-detects path: GiveAID.Client/.. -> project-NGO.v2/
+#
+# Resolves the v2 repo root using two strategies, in order:
+#   1. Walk up from this script's folder until we find GiveAID.V2.slnx
+#      (works regardless of where the repo was cloned).
+#   2. Fall back to scanning the current user's Desktop for common project
+#      folder names ("project NGO.v2", "NGO.v2", etc.). This preserves the
+#      legacy behaviour for users who keep the repo under their Desktop.
 
 $ErrorActionPreference = 'Stop'
 
-# Resolve v2 project root (2 levels up from scripts/, then look for NGO.v2 sibling):
-# scripts/ -> GiveAID.Client/ -> project NGO/ -> Desktop/
-# Desktop/ has both "project NGO" (old) and "project NGO.v2" (v2 solution)
-$clientRoot   = Resolve-Path (Join-Path $PSScriptRoot '..')                # GiveAID.Client
-$clientParent = (Get-Item $clientRoot).Parent.FullName                   # project NGO
-$desktop      = (Get-Item $clientParent).Parent.FullName                 # Desktop
+function Find-V2Root {
+    # Strategy 1: walk up from scripts/ looking for the .slnx marker.
+    $cursor = Resolve-Path $PSScriptRoot
+    for ($i = 0; $i -lt 8; $i++) {
+        if ($cursor.Path -match '[\\/]$') { $cursor = $cursor.Parent }
+        $slnx = Join-Path $cursor.Path 'GiveAID.V2.slnx'
+        if (Test-Path $slnx) { return $cursor.Path }
+        $parent = $cursor.Parent
+        if (-not $parent) { break }
+        $cursor = $parent
+    }
 
-# Dynamically locate the v2 sibling (the repo root for NGO.v2)
-# Try common v2 naming patterns first, then fall back to searching Desktop
-$v2Patterns = @(
-    'project NGO.v2',
-    'project NGO v2',
-    'NGO.v2',
-    'care4kids',
-    'project-NGO.v2'
-)
-$v2Root = $null
-foreach ($pattern in $v2Patterns) {
-    $candidate = Join-Path $desktop $pattern
-    if (Test-Path $candidate) {
-        # Verify this is actually the v2 solution by checking for the .slnx or csproj
+    # Strategy 2: scan Desktop for legacy pattern names.
+    $desktop = [Environment]::GetFolderPath('Desktop')
+    if (-not $desktop) { return $null }
+    $patterns = @(
+        'project NGO.v2',
+        'project NGO v2',
+        'project-NGO.v2',
+        'project-NGO',
+        'NGO.v2',
+        'NGO',
+        'care4kids'
+    )
+    foreach ($pattern in $patterns) {
+        $candidate = Join-Path $desktop $pattern
+        if (-not (Test-Path $candidate)) { continue }
         if ((Test-Path (Join-Path $candidate 'GiveAID.V2.slnx')) -or
             (Test-Path (Join-Path $candidate 'src\WebApi\GiveAID.V2.WebApi.csproj'))) {
-            $v2Root = $candidate
-            break
+            return $candidate
         }
     }
+
+    return $null
 }
 
-# Final validation — verify the expected WebApi project file exists
+$v2Root = Find-V2Root
 if (-not $v2Root) {
-    Write-Host "[start-backend] ERROR: Could not locate NGO.v2 project root." -ForegroundColor Red
-    Write-Host "[start-backend] Searched Desktop: $desktop" -ForegroundColor Yellow
-    Write-Host "[start-backend] Tried patterns: $($v2Patterns -join ', ')" -ForegroundColor Yellow
-    Write-Host "[start-backend] None of those directories contain GiveAID.V2.WebApi.csproj" -ForegroundColor Yellow
-    Write-Host "[start-backend] HINT: Ensure the repo is cloned at one of the above names under Desktop," -ForegroundColor Yellow
-    Write-Host "[start-backend]       OR move this script's 'GiveAID.Client' folder to be a sibling of the v2 root." -ForegroundColor Yellow
+    Write-Host "[start-backend] ERROR: Could not locate the GiveAID v2 project root." -ForegroundColor Red
+    Write-Host "[start-backend] Expected GiveAID.V2.slnx in this folder or a parent folder," -ForegroundColor Yellow
+    Write-Host "[start-backend] OR a folder named one of: project NGO.v2, NGO.v2, care4kids, ..." -ForegroundColor Yellow
+    Write-Host "[start-backend] sitting under $env:USERPROFILE\Desktop." -ForegroundColor Yellow
+    Write-Host "[start-backend] Fix: clone the repo with GiveAID.Client/ as a sub-folder of the solution root." -ForegroundColor Yellow
     exit 1
 }
 

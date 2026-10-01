@@ -4,21 +4,40 @@ import api from '../../services/api';
 import AdminPageFrame from '../../components/AdminPageFrame';
 import '../admin/AdminForm.css';
 
-/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+/* ----------------------------------------------------------------------
  * AdminDonationsPage
  *   Lists every donation across the platform.
  *   Filters: status (Completed/Pending/Failed/Refunded), search.
  *   Pagination: server-side via page/pageSize.
- * â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+ *
+ * NOTE on encoding:
+ *   This file is intentionally pure ASCII. All non-ASCII characters are
+ *   written as JavaScript Unicode escapes (\uXXXX) so the source cannot
+ *   be corrupted by an editor that saves in a non-UTF-8 encoding.
+ *   The visible em-dash, ellipsis, etc. are emitted at runtime by the
+ *   JavaScript engine, guaranteeing correct end-to-end UTF-8 behaviour.
+ * ---------------------------------------------------------------------- */
 
 const STATUS_OPTIONS = ['Completed', 'Pending', 'Failed', 'Refunded'];
 
+// Unicode characters used in this page, defined once via \uXXXX escapes.
+//   EM_DASH  = U+2014 EM DASH
+//   ELLIPSIS = U+2026 HORIZONTAL ELLIPSIS
+//   MIDDOT   = U+00B7 MIDDLE DOT
+//   ANGLE_L  = U+2039 SINGLE LEFT-POINTING ANGLE QUOTATION MARK
+//   ANGLE_R  = U+203A SINGLE RIGHT-POINTING ANGLE QUOTATION MARK
+const EM_DASH  = '\u2014';
+const ELLIPSIS = '\u2026';
+const MIDDOT   = '\u00B7';
+const ANGLE_L  = '\u2039';
+const ANGLE_R  = '\u203A';
+
 const fmtVnd = (n) => n != null
   ? new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(n)
-  : 'â€”';
+  : EM_DASH;
 
 const fmtDate = (iso) => {
-  if (!iso) return 'â€”';
+  if (!iso) return EM_DASH;
   const d = new Date(iso);
   return d.toLocaleString('en-GB', {
     day: '2-digit', month: 'short', year: 'numeric',
@@ -44,7 +63,7 @@ function AdminDonationsPage() {
   /* Fetch campaign list once for the dropdown */
   useEffect(() => {
     api.get('/campaigns', { params: { pageSize: 200 } })
-      .then((r) => r.data.success && setCampaigns(r.data.data || []))
+      .then((r) => setCampaigns(Array.isArray(r.items) ? r.items : []))
       .catch(() => {});
   }, []);
 
@@ -58,18 +77,16 @@ function AdminDonationsPage() {
       if (campaignFilter) params.campaignId = campaignFilter;
       if (dateFrom) params.dateFrom = dateFrom;
       if (dateTo) params.dateTo = dateTo;
-      const res = await api.get('/admin/donations', { params });
-      if (res.data.success) {
-        const d = res.data.data;
-        setItems(d.items || []);
-        setSummary(d.summary || { totalAmount: 0, averageAmount: 0 });
-        setPagination({
-          page: d.page,
-          pageSize: d.pageSize,
-          total: d.total,
-          totalPages: d.totalPages || 1,
-        });
-      }
+      const res = await api.get('/donations', { params });
+      // res is { items, page, pageSize, total, totalPages, summary }
+      setItems(res.items || []);
+      setSummary(res.summary || { totalAmount: 0, averageAmount: 0 });
+      setPagination({
+        page: res.page,
+        pageSize: res.pageSize,
+        total: res.total,
+        totalPages: res.totalPages || 1,
+      });
     } catch (err) {
       console.error(err);
       setErrorMsg(err.response?.data?.message || 'Failed to load donations.');
@@ -90,16 +107,16 @@ function AdminDonationsPage() {
     const arr = [];
     for (let i = 1; i <= tp; i++) {
       if (i === 1 || i === tp || Math.abs(i - cur) <= 2) arr.push(i);
-      else if (arr[arr.length - 1] !== 'â€¦') arr.push('â€¦');
+      else if (arr[arr.length - 1] !== ELLIPSIS) arr.push(ELLIPSIS);
     }
     return arr;
   })();
 
   return (
     <AdminPageFrame
-      eyebrow="Fundraising Â· Donations"
+      eyebrow={`Fundraising ${MIDDOT} Donations`}
       title="Donations"
-      sub="Every donation that has reached GiveAID â€” track status, donor, and impact."
+      sub={`Every donation that has reached GiveAID ${EM_DASH} track status, donor, and impact.`}
       error={errorMsg}
     >
       {/* Summary KPIs */}
@@ -132,7 +149,7 @@ function AdminDonationsPage() {
           <input
             type="text"
             className="af-search-input"
-            placeholder="Search donor, email, transaction ID, causeâ€¦"
+            placeholder={`Search donor, email, transaction ID, cause${ELLIPSIS}`}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -231,15 +248,15 @@ function AdminDonationsPage() {
                       {d.campaignName && <div className="af-cell-meta">{d.campaignName}</div>}
                     </td>
                     <td>
-                      <span className="af-cell-meta">{d.paymentMethod || 'â€”'}</span>
+                      <span className="af-cell-meta">{d.paymentMethod || EM_DASH}</span>
                     </td>
                     <td>
                       <span className={`af-pill af-pill-${(d.paymentStatus || '').toLowerCase()}`}>
-                        {d.paymentStatus || 'â€”'}
+                        {d.paymentStatus || EM_DASH}
                       </span>
                     </td>
                     <td>
-                      <code className="af-code">{d.transactionId || 'â€”'}</code>
+                      <code className="af-code">{d.transactionId || EM_DASH}</code>
                     </td>
                     <td>
                       <span className="af-cell-meta">{fmtDate(d.donationDate)}</span>
@@ -266,11 +283,11 @@ function AdminDonationsPage() {
                   disabled={pagination.page <= 1}
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                 >
-                  â€¹ Prev
+                  {`${ANGLE_L} Prev`}
                 </button>
                 {pageNumbers.map((n, idx) =>
-                  n === 'â€¦' ? (
-                    <span key={`gap-${idx}`} className="af-page-btn" style={{ border: 0, background: 'transparent' }} disabled>â€¦</span>
+                  n === ELLIPSIS ? (
+                    <span key={`gap-${idx}`} className="af-page-btn" style={{ border: 0, background: 'transparent' }} disabled>{ELLIPSIS}</span>
                   ) : (
                     <button
                       key={n}
@@ -288,7 +305,7 @@ function AdminDonationsPage() {
                   disabled={pagination.page >= pagination.totalPages}
                   onClick={() => setPage((p) => Math.min(pagination.totalPages, p + 1))}
                 >
-                  Next â€º
+                  {`Next ${ANGLE_R}`}
                 </button>
               </div>
             </div>
@@ -304,4 +321,3 @@ function AdminDonationsPage() {
 }
 
 export default AdminDonationsPage;
-

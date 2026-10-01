@@ -32,12 +32,7 @@ const ProgrammesPage = () => {
         eventsOnly: true,
         pageSize: 50
       });
-      if (response.success) {
-        const list = Array.isArray(response.data)
-          ? response.data
-          : (response.data?.items || []);
-        setEvents(list);
-      }
+      setEvents(Array.isArray(response) ? response : (response?.items || []));
     } catch (error) {
       console.error('Error loading events:', error);
     } finally {
@@ -81,15 +76,11 @@ const ProgrammesPage = () => {
     setRegisteringId(event.campaignId);
     setRegisterMsg({ type: '', text: '' });
     try {
-      const response = await api.post(`/campaigns/${event.campaignId}/register`, { notes: '' });
-      if (response.data.success) {
-        setRegisterMsg({ type: 'success', text: 'Registered! See you there.' });
-        loadEvents(); // refresh to update counts
-      } else {
-        setRegisterMsg({ type: 'error', text: response.data.message || 'Registration failed.' });
-      }
+      await api.post(`/campaigns/${event.campaignId}/register`, { notes: '' });
+      setRegisterMsg({ type: 'success', text: 'Registered! See you there.' });
+      loadEvents(); // refresh to update counts
     } catch (err) {
-      const msg = err.response?.data?.message || err.response?.data?.Message || 'Registration failed.';
+      const msg = err.response?.data?.message || err.response?.data?.Message || err.message || 'Registration failed.';
       setRegisterMsg({ type: 'error', text: msg });
     } finally {
       setRegisteringId(null);

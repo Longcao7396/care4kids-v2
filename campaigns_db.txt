@@ -1,0 +1,96 @@
+﻿28 A Mother's Care, A Mountain of Hope: Donate Today 3 337000000.00 175000000.00 1 /images/campaigns/C001.jpg Active
+29 Keep His Music Playing: Fund a Child's Education Today 1 374000000.00 258000000.00 1 /images/campaigns/C002.jpg Active
+31 Reach for the Sky: Help Every Girl Chase Her Dreams 1 448000000.00 215000000.00 1 /images/campaigns/C004.jpg Active
+32 Fill Every Desk with a Smile: Donate School Supplies 1 485000000.00 315000000.00 1 /images/campaigns/C005.jpg Active
+33 Behind This Smile Is a Dream: Help Make It Real 3 522000000.00 428000000.00 1 /images/campaigns/C006.jpg Active
+34 Their Road to School Is Long: Help Us Pave the Way 3 559000000.00 246000000.00 0 /images/campaigns/C007.jpg Active
+35 Lighten Their Load: Stand With Families Who Carry So Much 3 596000000.00 364000000.00 0 /images/campaigns/C008.jpg Active
+36 Five Little Faces, One Big Need: Give Warmth and Care 3 633000000.00 494000000.00 0 /images/campaigns/C009.jpg Active
+37 Little Shoulders, Heavy Baskets: Help Her Carry Her Dreams 1 670000000.00 268000000.00 0 /images/campaigns/C010.jpg Active
+38 Keep Them Warm This Winter: Donate a Jacket, Warm a Heart 3 707000000.00 403000000.00 0 /images/campaigns/C011.jpg Active
+39 Give Clean Water, Give Health: Donate Today 3 744000000.00 551000000.00 0 /images/campaigns/C012.jpg Active
+40 Every Step Over the Rocks Counts: Help Build Safer Paths 3 781000000.00 281000000.00 0 /images/campaigns/C013.jpg Active
+41 From Stone Pools to Safe Taps: Fund Clean Water for Villages 3 818000000.00 434000000.00 0 /images/campaigns/C014.jpg Active
+42 Ride Toward Tomorrow: Give a Bike, Open a Path to School 1 855000000.00 598000000.00 0 /images/campaigns/C015.jpg Active
+43 Long Roads, Bright Dreams: Sponsor a Child's Journey to School 1 892000000.00 776000000.00 0 /images/campaigns/C016.jpg Active
+44 Too Young to Carry So Much: Give Them Time to Be Kids 1 929000000.00 455000000.00 0 /images/campaigns/C017.jpg Active
+45 Let Every Child Play, Laugh and Fly: Protect Their Childhood 3 966000000.00 638000000.00 0 /images/campaigns/C018.jpg Active
+46 Together They Walk Toward Tomorrow: Walk With Them Today 1 303000000.00 251000000.00 0 /images/campaigns/C019.jpg Active
+47 Growing Up Too Fast: Help Every Child Have a Childhood 3 340000000.00 153000000.00 0 /images/campaigns/C020.jpg Active
+48 Two Friends, One Basket of Sunshine: Help Them Keep Smiling 3 377000000.00 234000000.00 0 /images/campaigns/C021.jpg Active
+50 Under One Umbrella: Help Us Shelter Every Child 3 451000000.00 185000000.00 0 /images/campaigns/C023.jpg Active
+51 Rosy Cheeks, Big Smiles: Keep Them Warm This Winter 3 488000000.00 283000000.00 0 /images/campaigns/C024.jpg Active
+52 Big Sister, Big Heart: Help Her Have Time to Learn and Play 1 525000000.00 394000000.00 0 /images/campaigns/C025.jpg Active
+53 Let Their Laughter Echo: Give Every Child a Joyful Childhood 3 562000000.00 208000000.00 0 /images/campaigns/C026.jpg Active
+54 Run Toward a Brighter Spring: Fund Their Future Today 1 599000000.00 323000000.00 0 /images/campaigns/C027.jpg Active
+55 A Shy Smile, A Big Dream: Sponsor a Child Today 3 636000000.00 452000000.00 0 /images/campaigns/C028.jpg Active
+56 A Whole Village of Smiles: Help Every Child Learn and Grow 3 673000000.00 592000000.00 0 /images/campaigns/C029.jpg Active
+57 Wrap Them in Warmth: Every Child Deserves a Cozy Winter 3 710000000.00 355000000.00 0 /images/campaigns/C030.jpg Active
+58 Bright Clothes, Brave Hearts: Stand With Every Child Today 3 747000000.00 500000000.00 0 /images/campaigns/C031.jpg Active
+59 Family Is the First Warmth: Help Families Stay Strong Together 3 784000000.00 659000000.00 0 /images/campaigns/C032.jpg Active
+60 Little Hands, Big Love: Help Every Child Feel Cared For 3 821000000.00 378000000.00 0 /images/campaigns/C033.jpg Active
+61 Where the Playground Is Made of Dirt: Help Us Build a Safe Place to Play 3 858000000.00 541000000.00 0 /images/campaigns/C034.jpg Active
+62 Bring Clean Water to Their Doorstep: Donate Today 3 895000000.00 716000000.00 0 /images/campaigns/C035.jpg Active
+63 Carrying Spring in a Basket: Help Them Carry Their Dreams Too 1 932000000.00 391000000.00 0 /images/campaigns/C036.jpg Active
+64 Laughing Barefoot: Help Us Give Them Shoes and Warm Clothes 3 969000000.00 572000000.00 0 /images/campaigns/C037.jpg Active
+65 Dressed in Color, Dreaming in Color: Help Every Girl Go to School 1 306000000.00 233000000.00 0 /images/campaigns/C038.jpg Active
+66 Smiles Like These Deserve a Future: Donate Today 3 343000000.00 130000000.00 0 /images/campaigns/C039.jpg Active
+67 Laughter Is Their Language: Help Us Protect Their Joy 3 380000000.00 209000000.00 0 /images/campaigns/C040.jpg Active
+68 Every Drop Counts: Bring Clean Water Closer to Every Child 3 417000000.00 300000000.00 0 /images/campaigns/C041.jpg Active
+69 Three Girls, One Bike, One Big Dream: Help Them Ride to School 1 454000000.00 404000000.00 0 /images/campaigns/C042.jpg Active
+70 Six Boys, One River, Endless Joy: Help Every Child Play Safely 3 491000000.00 250000000.00 0 /images/campaigns/C043.jpg Active
+71 Strong Families, Strong Mountains: Stand With Them Today 3 528000000.00 359000000.00 0 /images/campaigns/C044.jpg Active
+72 Through the Fog, They Still Carry On: Help Us Lift Their Burden 1 565000000.00 480000000.00 0 /images/campaigns/C045.jpg Active
+73 Heavy Bundles, Light Hearts: Help Them Make Room for School 1 602000000.00 283000000.00 0 /images/campaigns/C046.jpg Active
+74 One Warm Blanket Can Change a Winter Night: Give Warmth Today 3 639000000.00 409000000.00 0 /images/campaigns/C047.jpg Active
+75 Four Friends, Four Big Smiles: Help Every Child Belong 3 676000000.00 548000000.00 0 /images/campaigns/C048.jpg Active
+76 A Long Walk Through Golden Fields: Help Every Family Thrive 3 713000000.00 307000000.00 0 /images/campaigns/C049.jpg Active
+77 Little Eyes, Big Questions: Give Them School, Give Them Answers 1 750000000.00 450000000.00 0 /images/campaigns/C050.jpg Active
+78 Up in the Branches, Full of Dreams: Help Every Child Grow 1 824000000.00 321000000.00 0 /images/campaigns/C052.jpg Active
+79 Carrying Family, Chasing Bubbles: Give Them the Childhood They Deserve 3 861000000.00 482000000.00 0 /images/campaigns/C053.jpg Active
+80 A Warm Meal, A Full Heart: Help Us Feed Every Child 3 898000000.00 656000000.00 0 /images/campaigns/C054.jpg Active
+81 Born to Fly: Help Every Child Leap Into a Brighter Future 3 935000000.00 327000000.00 0 /images/campaigns/C055.jpg Active
+82 Little Chefs, Big Hopes: Help Us Fill Their School Kitchen 3 972000000.00 505000000.00 0 /images/campaigns/C056.jpg Active
+83 Clean Water for Every Little Face: Donate for Hygiene and Health 3 309000000.00 213000000.00 0 /images/campaigns/C057.jpg Active
+84 Muddy Hands, Bright Smiles: Help Every Child Grow Up Healthy 2 346000000.00 298000000.00 0 /images/campaigns/C058.jpg Active
+85 Small Hands in Big Fields: Help Farming Families Build a Better Harvest 3 383000000.00 184000000.00 0 /images/campaigns/C059.jpg Active
+86 Laughing in Color: Help Every Girl Keep Her Bright Future 1 420000000.00 273000000.00 0 /images/campaigns/C060.jpg Active
+87 Small Hands by the Fire: Help Families Put Food on the Table 3 457000000.00 375000000.00 0 /images/campaigns/C061.jpg Active
+88 Big Loads, Bigger Smiles: Help Lighten Their Journey 3 494000000.00 217000000.00 0 /images/campaigns/C062.jpg Active
+89 Clean Hands, Clean Cups, Healthy Kids: Bring Safe Water to Every School 3 531000000.00 324000000.00 0 /images/campaigns/C063.jpg Active
+90 From the Spring to the Doorstep: Bring Safe Water Home 3 568000000.00 443000000.00 0 /images/campaigns/C064.jpg Active
+91 Every Child Deserves a Full Bowl: Help Fund School Meals 3 605000000.00 242000000.00 0 /images/campaigns/C065.jpg Active
+92 A Circle of Friends in the Sunlight: Give Every Child a Safe Place to Belong 3 642000000.00 366000000.00 0 /images/campaigns/C066.jpg Active
+93 Red Earth, Big Imaginations: Help Us Give Every Child Toys and Books 1 679000000.00 502000000.00 0 /images/campaigns/C067.jpg Active
+94 Keep Their Heritage Ringing: Support Culture in Every Classroom 1 716000000.00 258000000.00 0 /images/campaigns/C068.jpg Active
+95 Building Their Own Tomorrow: Help Us Build Safe, Strong Schools 1 753000000.00 399000000.00 0 /images/campaigns/C069.jpg Active
+96 From Cabbage Rows to Classrooms: Help Her Keep Learning 1 790000000.00 553000000.00 0 /images/campaigns/C070.jpg Active
+97 Step by Step Toward Tomorrow: Help Every Child Reach the Classroom 1 827000000.00 719000000.00 0 /images/campaigns/C071.jpg Active
+98 A Sister's Love, A Child's Right to Learn: Help Her Go to School 1 864000000.00 423000000.00 0 /images/campaigns/C072.jpg Active
+99 Side by Side, Always: Help Every Child Grow Up Safe and Loved 3 901000000.00 595000000.00 0 /images/campaigns/C073.jpg Active
+100 Golden Days, Bright Futures: Help Every Girl Shine 1 938000000.00 779000000.00 0 /images/campaigns/C074.jpg Active
+101 Share a Little, Change a Lot: Every Gift Brings a Smile 3 975000000.00 439000000.00 0 /images/campaigns/C075.jpg Active
+102 Lift Them Up: Give Every Child a Loving Start in Life 3 312000000.00 193000000.00 0 /images/campaigns/C076.jpg Active
+103 Searching for Water Among the Rocks: Help Us Bring Clean Water Home 3 349000000.00 276000000.00 0 /images/campaigns/C077.jpg Active
+104 Purple Boots on a Long Road: Help Every Child Walk Toward Tomorrow 1 386000000.00 158000000.00 0 /images/campaigns/C078.jpg Active
+105 Hands Full of Flowers, Hearts Full of Hope: Give a Child a Future 3 423000000.00 245000000.00 0 /images/campaigns/C079.jpg Active
+106 Let Every Dream Bloom - Give a Child a Future Today 1 537000000.00 252000000.00 0 /images/campaigns/C101.jpg Active
+107 Help Us Build a Brighter Village - Donate Today 1 574000000.00 367000000.00 0 /images/campaigns/C102.jpg Active
+108 They're Waving Hello - Wave Back With a Donation 2 611000000.00 495000000.00 0 /images/campaigns/C103.jpg Active
+109 Mud on His Face, Joy in His Heart - Help Keep That Smile Safe 2 648000000.00 279000000.00 0 /images/campaigns/C104.jpg Active
+110 Too Young to Carry So Much - Help Lighten Their Load 1 685000000.00 411000000.00 0 /images/campaigns/C105.jpg Active
+111 From the Fields to the Classroom - Sponsor Her Education 1 722000000.00 556000000.00 0 /images/campaigns/C106.jpg Active
+112 Walk With Us to the Mountains - Fund the Next Journey 3 759000000.00 296000000.00 0 /images/campaigns/C107.jpg Active
+114 Little Feet, Big Needs - Give Warm Shoes and a Warm Meal 3 833000000.00 608000000.00 0 /images/campaigns/C109.jpg Active
+115 Where the Hills Are Dry, Let Hope Blossom - Donate Now 3 870000000.00 304000000.00 0 /images/campaigns/C110.jpg Active
+116 Side by Side, Tired but Hopeful - Stand With Them Today 3 907000000.00 472000000.00 0 /images/campaigns/C111.jpg Active
+117 She Carries the Spring - Help Us Carry Her Future 1 944000000.00 651000000.00 0 /images/campaigns/C112.jpg Active
+118 Every Drop Is a Climb - Bring Clean Water to the Mountains 3 981000000.00 844000000.00 0 /images/campaigns/C113.jpg Active
+119 Proud of Her Roots, Ready for Her Future - Support Her Dreams 1 318000000.00 153000000.00 0 /images/campaigns/C114.jpg Active
+121 Let Their Childhood Blossom, Donate Today 3 392000000.00 321000000.00 0 /images/campaigns/C116.jpg Active
+122 Small Hands, Big Hearts - Join Hands to Help Them 3 429000000.00 189000000.00 0 /images/campaigns/C117.jpg Active
+123 Every Child in This Line Needs You - Sponsor a Child Today 3 466000000.00 284000000.00 0 /images/campaigns/C118.jpg Active
+124 Smiling Through the Load - Give Her a Lighter Tomorrow 1 503000000.00 392000000.00 0 /images/campaigns/C119.jpg Active
+125 A Sister's Love Deserves Support - Help Them Thrive 2 540000000.00 216000000.00 0 /images/campaigns/C120.jpg Active
+
+(94 rows affected)

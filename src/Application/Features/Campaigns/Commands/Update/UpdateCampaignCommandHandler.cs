@@ -1,6 +1,7 @@
 using FluentValidation;
 using GiveAID.Application.Features.Campaigns.DTOs;
 using GiveAID.Application.Features.Campaigns.Validators;
+using GiveAID.Application.Services;
 using GiveAID.Domain.Entities;
 using MediatR;
 
@@ -13,11 +14,16 @@ public class UpdateCampaignCommandHandler : IRequestHandler<UpdateCampaignComman
 {
     private readonly IApplicationDbContext _context;
     private readonly IValidator<UpdateCampaignCommand> _validator;
+    private readonly ICacheService _cacheService;
 
-    public UpdateCampaignCommandHandler(IApplicationDbContext context, IValidator<UpdateCampaignCommand> validator)
+    public UpdateCampaignCommandHandler(
+        IApplicationDbContext context,
+        IValidator<UpdateCampaignCommand> validator,
+        ICacheService cacheService)
     {
         _context = context;
         _validator = validator;
+        _cacheService = cacheService;
     }
 
     public async Task<CampaignDto> Handle(UpdateCampaignCommand request, CancellationToken cancellationToken)
@@ -59,6 +65,8 @@ public class UpdateCampaignCommandHandler : IRequestHandler<UpdateCampaignComman
         await _context.SaveChangesAsync(cancellationToken);
 
         var cause = await _context.Causes.FindAsync(new object[] { campaign.CauseId }, cancellationToken);
+
+        _cacheService.InvalidateStatistics();
 
         return new CampaignDto
         {

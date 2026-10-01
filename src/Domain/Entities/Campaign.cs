@@ -55,7 +55,6 @@ public class Campaign : BaseEntity
 
     public bool IsFeatured { get; set; }
     public int DisplayOrder { get; set; }
-    public int? CreatedBy { get; set; }
 
     // Navigation properties
     [ForeignKey("CauseId")]

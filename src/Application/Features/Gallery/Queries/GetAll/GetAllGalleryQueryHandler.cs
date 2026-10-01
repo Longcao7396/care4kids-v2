@@ -6,7 +6,7 @@ namespace GiveAID.Application.Features.Gallery.Queries.GetAll;
 /// <summary>
 /// Handler for GetAllGalleryQuery.
 /// </summary>
-public class GetAllGalleryQueryHandler : IRequestHandler<GetAllGalleryQuery, IEnumerable<GalleryDto>>
+public class GetAllGalleryQueryHandler : IRequestHandler<GetAllGalleryQuery, GalleryPagedResult>
 {
     private readonly IApplicationDbContext _context;
 
@@ -15,7 +15,7 @@ public class GetAllGalleryQueryHandler : IRequestHandler<GetAllGalleryQuery, IEn
         _context = context;
     }
 
-    public async Task<IEnumerable<GalleryDto>> Handle(GetAllGalleryQuery request, CancellationToken cancellationToken)
+    public async Task<GalleryPagedResult> Handle(GetAllGalleryQuery request, CancellationToken cancellationToken)
     {
         var query = _context.Gallery
             .Include(g => g.Organization)
@@ -26,6 +26,10 @@ public class GetAllGalleryQueryHandler : IRequestHandler<GetAllGalleryQuery, IEn
             query = query.Where(g => g.Category == request.Category);
         }
 
+        // Count pre-pagination so the API can return the true total
+        // (was previously returning items.Count() == only items on this page)
+        var totalCount = await query.CountAsync(cancellationToken);
+
         var items = await query
             .OrderBy(g => g.DisplayOrder)
             .ThenByDescending(g => g.UploadedAt)
@@ -33,23 +37,27 @@ public class GetAllGalleryQueryHandler : IRequestHandler<GetAllGalleryQuery, IEn
             .Take(request.PageSize)
             .ToListAsync(cancellationToken);
 
-        return items.Select(g => new GalleryDto
+        return new GalleryPagedResult
         {
-            GalleryId = g.GalleryId,
-            Title = g.Title,
-            PhotoUrl = g.PhotoUrl,
-            ThumbnailUrl = g.ThumbnailUrl,
-            Category = g.Category,
-            Tags = g.Tags,
-            OrganizationId = g.OrganizationId,
-            OrganizationName = g.Organization?.OrganizationName,
-            DisplayOrder = g.DisplayOrder,
-            IsFeatured = g.IsFeatured,
-            UploadedAt = g.UploadedAt,
-            PublicId = g.PublicId,
-            OriginalFileName = g.OriginalFileName,
-            FileSizeBytes = g.FileSizeBytes,
-            ContentType = g.ContentType
-        });
+            Items = items.Select(g => new GalleryDto
+            {
+                GalleryId = g.GalleryId,
+                Title = g.Title,
+                PhotoUrl = g.PhotoUrl,
+                ThumbnailUrl = g.ThumbnailUrl,
+                Category = g.Category,
+                Tags = g.Tags,
+                OrganizationId = g.OrganizationId,
+                OrganizationName = g.Organization?.OrganizationName,
+                DisplayOrder = g.DisplayOrder,
+                IsFeatured = g.IsFeatured,
+                UploadedAt = g.UploadedAt,
+                PublicId = g.PublicId,
+                OriginalFileName = g.OriginalFileName,
+                FileSizeBytes = g.FileSizeBytes,
+                ContentType = g.ContentType
+            }),
+            TotalCount = totalCount
+        };
     }
 }

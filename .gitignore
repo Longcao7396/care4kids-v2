@@ -81,11 +81,40 @@ src/Scripts/UpsertRealPhotos/
 *.dll
 *.pdb
 
-# Temporary reports and session files
+# Local SQL Server backup files dropped into the repo root
+*.bak
+
+# IIS Express dev artifacts
+iis_*.txt
+
+# Local CRA + WebApi console logs (created by start-backend.ps1 / start-frontend.ps1)
+cra.err.log
+cra.out.log
+webapi.err.log
+webapi.out.log
+
+# dotnet ef build-time tool output
+*.assets.json
+project.assets.json
+
+# Distribution package staging (package-for-distribution.ps1 only — keep the script)
+package-staging/
+
+# Test output
+/TestResults/
+/playwright-report/
+/test-results/
+/coverage/
+
+# Distribution artifacts (built outputs the user should never commit)
+GiveAID.Client/build/
+GiveAID.Client/dist/
+publish/
+
+# Miscellaneous dev-only files that should not enter version control
+tree_output.txt
 PROGRESS_REPORT.md
 SESSION_SUMMARY.md
 TASK_COMPLETION_SUMMARY.md
 WORK_COMPLETE.md
-tree_output.txt
 cors-test.log.err
-verify-database.ps1

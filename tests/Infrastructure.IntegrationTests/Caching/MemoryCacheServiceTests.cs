@@ -164,7 +164,7 @@ public class MemoryCacheServiceTests
 
         // Assert
         result.Should().NotBeNull();
-        result.Id.Should().Be(100);
+        result!.Id.Should().Be(100);
         result.Name.Should().Be("Complex Test");
     }
 

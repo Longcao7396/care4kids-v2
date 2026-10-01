@@ -179,6 +179,17 @@
   margin: 0;
 }
 
+/* Following paragraphs of the About This Campaign description. Pairs the
+   lead paragraph above with the body-text styling used in cdp-prose so
+   the multi-paragraph copy reads as a single flowing narrative. */
+.cdp-desc-rest {
+  margin-top: var(--space-5);
+}
+
+.cdp-desc-rest p:last-child {
+  margin-bottom: 0;
+}
+
 /* ─── Stats row ─── */
 
 .cdp-stats-row {

@@ -14,6 +14,7 @@ public class OrganizationDto
     public string? ContactEmail { get; set; }
     public string? ContactPhone { get; set; }
     public string? Address { get; set; }
+    public string? RegistrationNumber { get; set; }
     public string? Mission { get; set; }
     public string? Vision { get; set; }
     public decimal? ContributionAmount { get; set; }

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card, Table, Badge, Alert, Button, Modal, Form, Spinner, ButtonGroup } from 'react-bootstrap';
 import api from '../../services/api';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function AchievementsAdmin() {
   const [items, setItems] = useState([]);
@@ -11,15 +12,14 @@ export default function AchievementsAdmin() {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
 
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'Admin';
+
   const load = useCallback(async () => {
     try {
       setLoading(true);
       const response = await api.get('/achievements', { params: { activeOnly: false, pageSize: 100 } });
-      if (response.data.success) {
-        const data = response.data.data;
-        const list = Array.isArray(data) ? data : (data?.items || []);
-        setItems(list);
-      }
+      setItems(Array.isArray(response) ? response : (response?.items || []));
     } catch (err) {
       setError('Failed to load achievements.');
     } finally {
@@ -72,16 +72,16 @@ export default function AchievementsAdmin() {
         beneficiaries: form.beneficiaries === '' ? null : Number(form.beneficiaries),
         displayOrder: Number(form.displayOrder) || 0,
       };
-      const response = editing
-        ? await api.put(`/achievements/${editing.achievementId}`, payload)
-        : await api.post('/achievements', payload);
-      if (response.data.success) {
-        setSuccess(editing ? 'Achievement updated.' : 'Achievement added.');
-        setShowModal(false);
-        load();
+      if (editing) {
+        await api.put(`/achievements/${editing.achievementId}`, payload);
+      } else {
+        await api.post('/achievements', payload);
       }
+      setSuccess(editing ? 'Achievement updated.' : 'Achievement added.');
+      setShowModal(false);
+      load();
     } catch (err) {
-      setError('Save failed.');
+      setError(err.message || 'Save failed.');
     }
   };
 
@@ -95,8 +95,6 @@ export default function AchievementsAdmin() {
       setError('Delete failed.');
     }
   };
-
-  const isSuperAdmin = JSON.parse(localStorage.getItem('giveaid_user') || '{}')?.role === 'SuperAdmin';
 
   return (
     <div>
@@ -145,7 +143,7 @@ export default function AchievementsAdmin() {
                   <td className="text-end">
                     <ButtonGroup size="sm">
                       <Button variant="outline-primary" onClick={() => openEdit(a)}>Edit</Button>
-                      {isSuperAdmin && (
+                      {isAdmin && (
                         <Button variant="outline-danger" onClick={() => handleDelete(a)}>Delete</Button>
                       )}
                     </ButtonGroup>

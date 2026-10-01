@@ -11,7 +11,7 @@ public class GetAllCampaignsQuery : IRequest<PagedCampaignsResult>
     public string? Status { get; set; }
     public int? CauseId { get; set; }
     public int Page { get; set; } = 1;
-    public int PageSize { get; set; } = 20;
+    public int PageSize { get; set; } = 12;
     /// <summary>
     /// M-05: When true, returns only campaigns that require registration (events).
     /// </summary>

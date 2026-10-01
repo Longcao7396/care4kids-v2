@@ -40,7 +40,7 @@ export default function RaiseQueryPage() {
     try {
       setLoadingList(true);
       const res = await api.get('/conversations/mine', { params: statusFilter ? { status: statusFilter } : {} });
-      if (res.data.success) setMyQueries(res.data.data || []);
+      setMyQueries(Array.isArray(res) ? res : (res?.items || []));
     } catch { /* non-fatal */ }
     finally { setLoadingList(false); }
   }, [statusFilter]);
@@ -59,14 +59,12 @@ export default function RaiseQueryPage() {
     setSubmitSuccess(null);
     try {
       const res = await api.post('/conversations', form);
-      if (res.data.success) {
-        setSubmitSuccess(res.data);
-        setForm(EMPTY_FORM);
-        setErrors({});
-        fetchMine();
-      }
+      setSubmitSuccess({ message: 'Query submitted successfully.', data: res });
+      setForm(EMPTY_FORM);
+      setErrors({});
+      fetchMine();
     } catch (err) {
-      setErrors({ submit: err.response?.data?.message || 'Failed to submit query.' });
+      setErrors({ submit: err.response?.data?.message || err.message || 'Failed to submit query.' });
     } finally {
       setSubmitting(false);
     }
@@ -78,9 +76,9 @@ export default function RaiseQueryPage() {
     setReplyText('');
     try {
       const res = await api.get(`/conversations/${id}`);
-      if (res.data.success) setDetail(res.data.data);
+      setDetail(res || null);
     } catch (err) {
-      setDetail({ error: err.response?.data?.message || 'Failed to load conversation.' });
+      setDetail({ error: err.response?.data?.message || err.message || 'Failed to load conversation.' });
     } finally {
       setDetailLoading(false);
     }
@@ -153,7 +151,7 @@ export default function RaiseQueryPage() {
             <Card>
               <Card.Header className="bg-transparent border-bottom"
                 style={{ borderColor: 'var(--border-slate) !important' }}>
-                <h5 className="mb-0 text-light">
+                <h5 className="mb-0" style={{ color: 'var(--c4k-charcoal, #1A1A1A)', fontWeight: 600 }}>
                   <i className="bi bi-chat-square-text-fill me-2 text-accent"></i>
                   Submit a new query
                 </h5>
@@ -238,7 +236,7 @@ export default function RaiseQueryPage() {
               <Card.Header className="bg-transparent border-bottom"
                 style={{ borderColor: 'var(--border-slate) !important' }}>
                 <div className="d-flex justify-content-between align-items-center flex-wrap gap-2">
-                  <h5 className="mb-0 text-light">
+                  <h5 className="mb-0" style={{ color: 'var(--c4k-charcoal, #1A1A1A)', fontWeight: 600 }}>
                     <i className="bi bi-inbox-fill me-2 text-accent"></i>
                     My Queries <Badge bg="primary" className="ms-1">{filtered.length}</Badge>
                   </h5>

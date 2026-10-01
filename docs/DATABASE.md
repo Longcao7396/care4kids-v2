@@ -36,10 +36,19 @@ in `src/Infrastructure/Persistence/Migrations/`.
 │ TransactionId      │
 │ StripeIntentId     │
 └────────────────────┘
+
+   Append-only sidecar — written by SaveChangesAsync, never mutated by application code:
+   ┌────────────────────────────────────────────────────────────────────────┐
+   │ audit_logs                                                            │
+   │ audit_log_id (PK) · user_id · action · entity_type · entity_id ·      │
+   │ old_values (JSON) · new_values (JSON) · timestamp ·                   │
+   │ ip_address · user_agent                                                │
+   │ Indexed by user_id, timestamp, (entity_type, entity_id)               │
+   └────────────────────────────────────────────────────────────────────────┘
 ```
 
 (Other entities — Gallery, Team, Achievements, Careers, FAQs, Contact, Conversations,
-Invitations, CMS, EmailLogs, WebhookLogs — follow the same pattern.)
+Invitations, CMS, EmailLogs, WebhookLogs, AuditLogs — follow the same pattern.)
 
 ## 2. Tables
 
@@ -199,6 +208,79 @@ Indexes: `Status`, `CreatedAt`.
 
 Indexes: `Source`, `EventType`, `EventId` (unique within source).
 
+### 2.9. `audit_logs`
+
+Append-only log of entity mutations performed through the application. **Auto-populated
+by `GiveAIDDbContext.SaveChangesAsync`** — application code never writes here directly.
+The intercept path also handles the soft-delete pattern (see
+[ARCHITECTURE.md §6.1](ARCHITECTURE.md)).
+
+**Purpose**
+
+- **Compliance** — prove who changed what, when, for regulators and donors
+- **Change tracking** — full before/after JSON snapshots for every Create/Update/Delete
+- **Forensics** — investigate suspicious activity, reconstruct history, recover deleted rows
+
+| Column         | Type           | Null | Notes                                              |
+|----------------|----------------|------|----------------------------------------------------|
+| audit_log_id   | int            | No   | PK, identity                                       |
+| user_id        | nvarchar(450)  | Yes  | FK-shaped string → Users.UserId (`ICurrentUserService.GetUserId()`); null for system actions |
+| action         | nvarchar(50)   | No   | `Create`, `Update`, `Delete`, `Login`, `Logout`     |
+| entity_type    | nvarchar(100)  | Yes  | CLR type name of the affected entity (e.g. `Campaign`, `Donation`) |
+| entity_id      | nvarchar(450)  | Yes  | Stringified primary key of the affected entity     |
+| old_values     | nvarchar(max)  | Yes  | JSON snapshot **before** the change (null for Create) |
+| new_values     | nvarchar(max)  | Yes  | JSON snapshot **after** the change (null for Delete) |
+| timestamp      | datetime2      | No   | UTC, default `SYSUTCDATETIME()`                    |
+| ip_address     | nvarchar(45)   | Yes  | Client IPv4/IPv6 (set by middleware when available) |
+| user_agent     | nvarchar(500)  | Yes  | Browser / client identifier                        |
+
+Indexes:
+
+- `idx_audit_logs_user_id` on `user_id`
+- `idx_audit_logs_timestamp` on `timestamp`
+- `idx_audit_logs_entity` on `(entity_type, entity_id)`
+
+> **Note:** `OldValues` and `NewValues` skip the audit fields `CreatedAt`, `UpdatedAt`,
+> `CreatedBy`, `UpdatedBy`, `IsDeleted`, `DeletedAt` — they capture only the **business
+> payload**. Soft deletes still log the pre-soft-delete `OldValues` (because the
+> interception flips `EntityState` to `Modified` before serialisation).
+
+**Example queries**
+
+Get all changes by a specific user (last 30 days):
+
+```sql
+SELECT audit_log_id, action, entity_type, entity_id, timestamp
+FROM audit_logs
+WHERE user_id = '42'
+  AND timestamp >= DATEADD(DAY, -30, SYSUTCDATETIME())
+ORDER BY timestamp DESC;
+```
+
+Get full change history for a specific entity (e.g. campaign 7):
+
+```sql
+SELECT audit_log_id, user_id, action, timestamp, old_values, new_values
+FROM audit_logs
+WHERE entity_type = 'Campaign'
+  AND entity_id   = '7'
+ORDER BY timestamp ASC;
+```
+
+Get recent soft-delete actions across the system:
+
+```sql
+SELECT audit_log_id, user_id, entity_type, entity_id, timestamp
+FROM audit_logs
+WHERE action     = 'Delete'
+  AND timestamp >= DATEADD(DAY, -7, SYSUTCDATETIME())
+ORDER BY timestamp DESC;
+```
+
+Retention: see [§9 Data Retention](#9-data-retention) — `audit_logs` are retained
+indefinitely for compliance, but old rows may be archived to cold storage by a
+SQL Agent job.
+
 ## 3. Migration Order
 
 EF Core generates timestamped migrations. For a fresh database:
@@ -209,9 +291,20 @@ dotnet ef database update --project src/Infrastructure/GiveAID.V2.Infrastructure
 ```
 
 The first run also runs `DatabaseSeeder` which inserts:
-- 1 `Admin` user (`admin@give-aid.org` / `Admin@123`)
+- 1 `Admin` user (username: `admin`, email: `admin@give-aid.org`, password: `Admin@123`)
 - 5 demo causes (`CHILD`, `EDU`, `DIS`, `WOMAN`, `YOUTH`)
 - 3 demo FAQs
+
+Notable migrations shipped with **v2.0**:
+
+| Migration                         | Purpose                                                              |
+|-----------------------------------|----------------------------------------------------------------------|
+| `…_InitialCreate`                 | Base schema (Users, Campaigns, Donations, …)                         |
+| `…_AddAuditLogTable`              | Adds `audit_logs` table + 3 indexes for the audit-log MVP (§2.9)     |
+
+> Existing v2.0 databases upgrading to the audit-log release will have
+> `audit_logs` created by `…_AddAuditLogTable` automatically on next
+> `dotnet ef database update`. No backfill of historical changes is performed.
 
 For the **legacy v1 → v2** migration path, see [MIGRATION_GUIDE.md](MIGRATION_GUIDE.md)
 and `database/migrations/`.
@@ -231,6 +324,7 @@ and `database/migrations/`.
 | EmailLogs                | `Status`, `CreatedAt`                                  |
 | WebhookLogs              | `Source`, `EventType`, `EventId` UNIQUE                |
 | Galleries                | `Category`, `CauseId`, `ProgrammeId`                   |
+| audit_logs               | `user_id`, `timestamp`, `(entity_type, entity_id)`     |
 
 ## 5. Connection String
 
@@ -284,6 +378,7 @@ public async Task SeedAsync()
     {
         _context.Users.Add(new User
         {
+            Username = "admin",
             Email = "admin@give-aid.org",
             PasswordHash = _hasher.Hash("Admin@123"),
             Role = "Admin",
@@ -313,5 +408,9 @@ public async Task SeedAsync()
 | Conversations | Indefinite (user data)             |
 | Donations     | Indefinite (financial record)      |
 | EmailLogs (PII) | Anonymise after 90 days          |
+| audit_logs     | Indefinite (compliance record)    |
 
 Run nightly via SQL Agent job — see `database/migrations/retention.sql`.
+
+> `audit_logs` rows must not be deleted from the live database without sign-off.
+> Archival to cold storage (e.g. blob/AWS S3 Glacier) is permitted.

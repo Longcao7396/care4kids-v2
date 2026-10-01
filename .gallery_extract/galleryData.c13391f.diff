@@ -1,0 +1,389 @@
+﻿commit c13391f591050719c953eb895a3c97ef362071b0
+Author: Long Cao <[email protected]>
+Date:   Mon Sep 28 13:36:20 2026 +0700
+
+    refactor: update React frontend - pages, components, and services
+    
+    Frontend updates:
+    - Update App.js with new routes and navigation
+    - Update AuthContext with improved token handling
+    - Update API service with envelope unwrapping and 401 handling
+    - Update config with backend URLs
+    
+    Pages (Public):
+    - Update HomePage, AboutPage, CampaignsPage, CampaignDetailPage
+    - Update DonatePage with Stripe integration
+    - Update ContactPage, GalleryPage, HelpCentrePage
+    - Update LoginPage, RegisterPage with validation
+    - Update OurPartnersPage, ProgrammeDetailPage
+    
+    Pages (Admin):
+    - Update AdminDashboard with charts (Recharts)
+    - Update AdminGalleryPage with Cloudinary upload
+    - Add AdminRegistrationsPage for event registration management
+    
+    Components & Services:
+    - Update ImageUpload component
+    - Update AdminLayout with navigation
+    - Update API services (gallery, registration, donations)
+    - Update sample data (campaigns, FAQs, organizations)
+    
+    Build configuration:
+    - Update package.json dependencies (React 18, React Router 6)
+    - Update package-lock.json
+    - Update start-backend.ps1 script
+    
+    Co-authored-by: Cursor <cursoragent@cursor.com>
+
+diff --git a/GiveAID.Client/src/data/galleryData.js b/GiveAID.Client/src/data/galleryData.js
+index febfbbd..f23dd1e 100644
+--- a/GiveAID.Client/src/data/galleryData.js
++++ b/GiveAID.Client/src/data/galleryData.js
+@@ -5,10 +5,13 @@
+ //   - 'tall'   : 4:5 portrait close-up
+ //   - 'square' : 1:1 thumbnail
+ //
+-// ALL images are sourced from Unsplash and chosen to represent
+-// Vietnamese children in real NGO contexts: classrooms, meals, healthcare,
+-// shelters, community events. Where a specific scene is hard to source,
+-// we use a simple representative image (book stack, water jug, heart icon).
++// Source policy:
++//   - All URLs are Cloudinary-hosted (`res.cloudinary.com/mczqcagv`).
++//   - Each item carries `publicId` so the AdminGalleryPage Cloudinary preview
++//     can render the asset even when the API is unreachable.
++//   - Duplicates inside this fallback dataset have been removed (g-007 vs g-020,
++//     g-003 vs g-016). Reuse of the same image as a DB row is acceptable because
++//     this fallback only renders when /api/v1/gallery is offline.
+ 
+ export const GALLERY_CATEGORIES = [
+   { id: 'all',         label: 'All Stories',  icon: 'gallery' },
+@@ -23,211 +26,231 @@ export const GALLERY_CATEGORIES = [
+ ];
+ 
+ export const GALLERY_IMAGES = [
+-  // ΓöÇΓöÇΓöÇ WIDE / HERO (Vietnamese schoolchildren & disaster) ΓöÇΓöÇΓöÇΓöÇΓöÇ
++  // ΓöÇΓöÇΓöÇ WIDE / HERO ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+   {
+     id: 'g-001',
+-    url: 'https://images.unsplash.com/photo-1497486751825-1233686d5d80?auto=format&fit=crop&w=1600&q=80',
+-    title: 'Lß╗¢p hß╗ìc v├╣ng cao ΓÇö Knowledge for the mountains',
+-    caption: 'Trß║╗ em v├╣ng cao T├óy Bß║»c hß╗ìc chß╗» trong lß╗¢p hß╗ìc cß╗Öng ─æß╗ông do Care4Kids x├óy dß╗▒ng.',
+-    location: 'L├áo Cai, Viß╗çt Nam',
++    url: 'https://res.cloudinary.com/mczqcagv/image/upload/v1790337357/giveaid/replacement/thieunhi9-2869-1401513005_chlpkd.webp',
++    publicId: 'giveaid/replacement/thieunhi9-2869-1401513005_chlpkd',
++    title: 'Mountain Classrooms ΓÇö Knowledge for the Highlands',
++    caption: 'Children in the northern highlands of Vietnam learn to read in a community classroom built and supported by Care4Kids.',
++    location: 'Lao Cai, Vietnam',
+     category: 'education',
+     layout: 'wide',
+     alt: 'Vietnamese schoolchildren studying in a rural classroom',
+   },
+   {
+     id: 'g-002',
+-    url: 'https://images.unsplash.com/photo-1577896851231-70ef18881754?auto=format&fit=crop&w=1600&q=80',
+-    title: 'Cß╗⌐u trß╗ú l┼⌐ lß╗Ñt miß╗ün Trung ΓÇö Standing with our communities',
+-    caption: '─Éß╗Öi cß╗⌐u trß╗ú ph├ón ph├ít nhu yß║┐u phß║⌐m cho c├íc gia ─æ├¼nh bß╗ï ß║únh h╞░ß╗ƒng sau b├úo.',
+-    location: 'Quß║úng B├¼nh, Viß╗çt Nam',
++    url: 'https://res.cloudinary.com/mczqcagv/image/upload/v1790337373/giveaid/replacement/9-1631871700_yocxhv.webp',
++    publicId: 'giveaid/replacement/9-1631871700_yocxhv',
++    title: 'Central Vietnam Flood Relief ΓÇö Standing With Our Communities',
++    caption: 'Relief teams distribute food and household supplies to families rebuilding their homes after a typhoon.',
++    location: 'Quang Binh, Vietnam',
+     category: 'relief',
+     layout: 'wide',
+-    alt: 'Disaster relief aid distribution in flood-affected village',
++    alt: 'Disaster relief aid distribution in a flood-affected village',
+   },
+ 
+-  // ΓöÇΓöÇΓöÇ TALL / PORTRAIT (Vietnamese children portraits) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
++  // ΓöÇΓöÇΓöÇ TALL / PORTRAIT ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+   {
+     id: 'g-003',
+-    url: 'https://images.unsplash.com/photo-1542810634-71277d95dcbb?auto=format&fit=crop&w=800&q=80',
+-    title: 'Nß╗Ñ c╞░ß╗¥i cß╗ºa em',
+-    caption: 'Mß╗Öt em nhß╗Å tß║íi m├íi ß║Ñm B├¼nh D╞░╞íng trong ng├áy nhß║¡n qu├á Trung thu.',
+-    location: 'B├¼nh D╞░╞íng',
++    url: 'https://res.cloudinary.com/mczqcagv/image/upload/v1790337417/giveaid/replacement/6.2-1_emufuw.jpg',
++    publicId: 'giveaid/replacement/6.2-1_emufuw',
++    title: 'Everyday Joy at the Care Home',
++    caption: 'A child at the Binh Duong care home shares a laugh with a volunteer during the Mid-Autumn celebration.',
++    location: 'Binh Duong, Vietnam',
+     category: 'portraits',
+     layout: 'tall',
+-    alt: 'Smiling Vietnamese child portrait',
++    alt: 'Smiling Vietnamese child at a care home',
+   },
+   {
+     id: 'g-004',
+-    url: 'https://images.unsplash.com/photo-1515488042361-ee884cd86774?auto=format&fit=crop&w=800&q=80',
+-    title: 'Kh├ím sß╗⌐c khß╗Åe ─æß╗ïnh kß╗│',
+-    caption: 'B├íc s─⌐ t├¼nh nguyß╗çn kh├ím sß╗⌐c khß╗Åe cho trß║╗ em v├╣ng s├óu tß║íi trß║ím y tß║┐ l╞░u ─æß╗Öng.',
+-    location: 'Nghß╗ç An',
++    url: 'https://res.cloudinary.com/mczqcagv/image/upload/v1790337355/giveaid/replacement/thieunhi11-6736-1401513005_qhyasf.webp',
++    publicId: 'giveaid/replacement/thieunhi11-6736-1401513005_qhyasf',
++    title: 'Mobile Health Checkups in Remote Villages',
++    caption: 'Volunteer doctors travel to remote villages to provide free health screenings for children and their families.',
++    location: 'Nghe An, Vietnam',
+     category: 'health',
+     layout: 'tall',
+     alt: 'Community health worker checkup for village children',
+   },
+   {
+     id: 'g-005',
+-    url: 'https://images.unsplash.com/photo-1503454537195-1dcabb73ffb9?auto=format&fit=crop&w=800&q=80',
+-    title: 'Em ─æß╗ìc s├ích ß╗ƒ th╞░ viß╗çn l├áng',
+-    caption: 'Kh├┤ng gian ─æß╗ìc s├ích miß╗àn ph├¡ ─æ╞░ß╗úc dß╗▒ng tß╗½ container cho trß║╗ em n├┤ng th├┤n.',
+-    location: 'Bß║»c Kß║ín',
++    url: 'https://res.cloudinary.com/mczqcagv/image/upload/v1790337360/giveaid/replacement/thieunhi10-5429-1401513005_gxt9br.webp',
++    publicId: 'giveaid/replacement/thieunhi10-5429-1401513005_gxt9br',
++    title: 'Reading Hour at the Village Library',
++    caption: 'A free reading space built from a recycled shipping container gives rural children their first library.',
++    location: 'Bac Kan, Vietnam',
+     category: 'education',
+     layout: 'tall',
+     alt: 'Children reading books at a rural community library',
+   },
+   {
+     id: 'g-006',
+-    url: 'https://images.unsplash.com/photo-1509099836639-18ba1795216d?auto=format&fit=crop&w=800&q=80',
+-    title: 'Ti├¬m chß╗ºng mß╗ƒ rß╗Öng',
+-    caption: 'Chiß║┐n dß╗ïch ti├¬m vaccine ph├▓ng sß╗ƒi cho 800 trß║╗ em d╞░ß╗¢i 5 tuß╗òi tß║íi Quß║úng Nam.',
+-    location: 'Quß║úng Nam',
++    url: 'https://res.cloudinary.com/mczqcagv/image/upload/v1790337359/giveaid/replacement/thieunhi12-3723-1401513005_k7ekiw.webp',
++    publicId: 'giveaid/replacement/thieunhi12-3723-1401513005_k7ekiw',
++    title: 'Measles Vaccination Drive',
++    caption: 'A regional vaccination campaign reaches 800 children under five in Quang Nam province.',
++    location: 'Quang Nam, Vietnam',
+     category: 'health',
+     layout: 'tall',
+     alt: 'Child vaccination at a rural clinic',
+   },
+ 
+-  // ΓöÇΓöÇΓöÇ SQUARE / STANDARD ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
++  // ΓöÇΓöÇΓöÇ SQUARE / STANDARD ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+   {
+     id: 'g-007',
+-    url: 'https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?auto=format&fit=crop&w=800&q=80',
+-    title: 'Bß╗»a c╞ím c├│ thß╗ït',
+-    caption: 'H╞ín 850 suß║Ñt c╞ím dinh d╞░ß╗íng mß╗ùi ng├áy cho c├íc m├íi ß║Ñm tr├¬n ─æß╗ïa b├án TP.HCM.',
+-    location: 'TP. Hß╗ô Ch├¡ Minh',
+-    category: 'health',
++    url: 'https://res.cloudinary.com/mczqcagv/image/upload/v1790337412/giveaid/replacement/thieunhi-6226-1401513004_dqjcpq.webp',
++    publicId: 'giveaid/replacement/thieunhi-6226-1401513004_dqjcpq',
++    title: 'Daily Learning in the Highlands',
++    caption: 'A morning study session at one of our partner schools in the northern mountains.',
++    location: 'Son La, Vietnam',
++    category: 'education',
+     layout: 'square',
+-    alt: 'Children sharing a meal at a care home',
++    alt: 'Children studying together at a highland school',
+   },
+   {
+     id: 'g-008',
+-    url: 'https://images.unsplash.com/photo-1559827260-dc66d52bef19?auto=format&fit=crop&w=800&q=80',
+-    title: 'Giß║┐ng n╞░ß╗¢c sß║ích cho bß║ún l├áng',
+-    caption: 'Kh├ính th├ánh giß║┐ng khoan cung cß║Ñp n╞░ß╗¢c sß║ích cho 120 hß╗Ö d├ón v├╣ng cao.',
+-    location: 'S╞ín La',
++    url: 'https://res.cloudinary.com/mczqcagv/image/upload/v1790337416/giveaid/replacement/6.1-1_byrdld.jpg',
++    publicId: 'giveaid/replacement/6.1-1_byrdld',
++    title: 'Clean Water Wells for Mountain Villages',
++    caption: 'A newly drilled well now provides safe drinking water for 120 households in the highland community.',
++    location: 'Son La, Vietnam',
+     category: 'water',
+     layout: 'square',
+     alt: 'Children fetching clean water from a village well',
+   },
+   {
+     id: 'g-009',
+-    url: 'https://images.unsplash.com/photo-1532629345422-7515f3d16bb6?auto=format&fit=crop&w=800&q=80',
+-    title: 'Trß╗ông rau c├╣ng c├íc em',
+-    caption: 'V╞░ß╗¥n rau hß╗ìc ─æ╞░ß╗¥ng ΓÇö dß║íy trß║╗ em tß╗▒ trß╗ông thß╗▒c phß║⌐m sß║ích tß║íi tr╞░ß╗¥ng nß╗Öi tr├║.',
+-    location: 'H├á Nß╗Öi',
+-    category: 'environment',
++    url: 'https://res.cloudinary.com/mczqcagv/image/upload/v1790337418/giveaid/replacement/8-1_dub1wh.jpg',
++    publicId: 'giveaid/replacement/8-1_dub1wh',
++    title: 'A New Day at the Boarding School',
++    caption: 'Students at the boarding school start the morning with shared chores and breakfast in the garden.',
++    location: 'Hanoi, Vietnam',
++    category: 'community',
+     layout: 'square',
+-    alt: 'Children tending to a school garden',
++    alt: 'Children starting their day at a boarding school',
+   },
+   {
+     id: 'g-010',
+-    url: 'https://images.unsplash.com/photo-1577896851231-70ef18881754?auto=format&fit=crop&w=800&q=80',
+-    title: 'T├¼nh nguyß╗çn vi├¬n dß║íy tiß║┐ng Anh',
+-    caption: 'Lß╗¢p tiß║┐ng Anh miß╗àn ph├¡ cuß╗æi tuß║ºn do 12 t├¼nh nguyß╗çn vi├¬n quß╗æc tß║┐ giß║úng dß║íy.',
+-    location: 'B├¼nh D╞░╞íng',
++    url: 'https://res.cloudinary.com/mczqcagv/image/upload/v1790337419/giveaid/replacement/1000009589_Photo-No.-4_kbt98c.webp',
++    publicId: 'giveaid/replacement/1000009589_Photo-No.-4_kbt98c',
++    title: 'Volunteers Supporting Our Children',
++    caption: 'International volunteers spend their weekends teaching English and life skills to children across the region.',
++    location: 'Binh Duong, Vietnam',
+     category: 'community',
+     layout: 'square',
+-    alt: 'Volunteer teaching English to children outdoors',
++    alt: 'Volunteers teaching children outdoors',
+   },
+   {
+     id: 'g-011',
+-    url: 'https://images.unsplash.com/photo-1576091160550-2173dba999ef?auto=format&fit=crop&w=800&q=80',
+-    title: 'Mß╗ò tim nh├ón ─æß║ío ΓÇö Cß╗⌐u mß╗Öt em nhß╗Å',
+-    caption: 'Ca phß║½u thuß║¡t tim bß║⌐m sinh th├ánh c├┤ng cho b├⌐ g├íi 4 tuß╗òi tß╗½ gia ─æ├¼nh kh├│ kh─ân.',
+-    location: 'Bß╗çnh viß╗çn E, H├á Nß╗Öi',
+-    category: 'health',
++    url: 'https://res.cloudinary.com/mczqcagv/image/upload/v1790337421/giveaid/replacement/3R-2935-1405048038_ukg4qf.webp',
++    publicId: 'giveaid/replacement/3R-2935-1405048038_ukg4qf',
++    title: 'Emergency Relief Distribution',
++    caption: 'Relief workers organize food parcels and medicine for families displaced by severe flooding.',
++    location: 'Nghe An, Vietnam',
++    category: 'relief',
+     layout: 'square',
+-    alt: 'Pediatric heart surgery preparation',
++    alt: 'Relief workers preparing emergency supplies',
+   },
+   {
+     id: 'g-012',
+-    url: 'https://images.unsplash.com/photo-1602052793312-b779c08a90d6?auto=format&fit=crop&w=800&q=80',
+-    title: 'Dß╗ìn dß║╣p sau l┼⌐ c├╣ng b├á con',
+-    caption: '─Éß╗Öi t├¼nh nguyß╗çn vi├¬n c├╣ng ng╞░ß╗¥i d├ón dß╗ìn dß║╣p b├╣n ─æß║Ñt sau ─æß╗út l┼⌐ lß╗ïch sß╗¡.',
+-    location: 'H├á T─⌐nh',
+-    category: 'relief',
++    url: 'https://res.cloudinary.com/mczqcagv/image/upload/v1790337422/giveaid/replacement/4R-6525-1405048038_fqstad.webp',
++    publicId: 'giveaid/replacement/4R-6525-1405048038_fqstad',
++    title: 'Caring for Our Youngest',
++    caption: 'Caregivers provide daily support, nutrition, and education for children living in our partner shelters.',
++    location: 'Ha Tinh, Vietnam',
++    category: 'community',
+     layout: 'square',
+-    alt: 'Volunteers helping flood recovery in a community',
++    alt: 'Caregivers supporting children at a community shelter',
+   },
+ 
+   // ΓöÇΓöÇΓöÇ MORE PORTRAITS / CANDID ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+   {
+     id: 'g-013',
+-    url: 'https://images.unsplash.com/photo-1542884748-2b87b36c6b90?auto=format&fit=crop&w=800&q=80',
+-    title: 'Ch├ón dung em b├⌐ v├╣ng cao',
+-    caption: '├ünh mß║»t trong veo cß╗ºa em nhß╗Å 6 tuß╗òi tß║íi ─æiß╗âm tr╞░ß╗¥ng M╞░ß╗¥ng Kh╞░╞íng.',
+-    location: 'L├áo Cai',
++    url: 'https://res.cloudinary.com/mczqcagv/image/upload/v1790337414/giveaid/replacement/senh1-7468-1396341888_qrbxq7.webp',
++    publicId: 'giveaid/replacement/senh1-7468-1396341888_qrbxq7',
++    title: 'Portrait of a Highland Child',
++    caption: 'The bright eyes of a six-year-old student at the Muong Khuong school outpost.',
++    location: 'Lao Cai, Vietnam',
+     category: 'portraits',
+     layout: 'tall',
+     alt: 'Close-up portrait of a rural Vietnamese child',
+   },
+   {
+     id: 'g-014',
+-    url: 'https://images.unsplash.com/photo-1492725764893-90f379a98020?auto=format&fit=crop&w=800&q=80',
+-    title: 'Gia ─æ├¼nh em sau buß╗òi kh├ím bß╗çnh',
+-    caption: 'Mß║╣ con chß╗ï H╞░╞íng tß║íi phi├¬n kh├ím sß╗⌐c khß╗Åe miß╗àn ph├¡ th├íng 6.',
+-    location: 'Bß║┐n Tre',
++    url: 'https://res.cloudinary.com/mczqcagv/image/upload/v1790337413/giveaid/replacement/hong-3448-1396341887_d4zral.webp',
++    publicId: 'giveaid/replacement/hong-3448-1396341887_d4zral',
++    title: 'A Family After the Checkup',
++    caption: 'A mother and her child leave the free community health screening held in June.',
++    location: 'Ben Tre, Vietnam',
+     category: 'portraits',
+     layout: 'square',
+     alt: 'Vietnamese mother and child at a community health program',
+   },
+   {
+     id: 'g-015',
+-    url: 'https://images.unsplash.com/photo-1581090464777-f3220bbe1b8b?auto=format&fit=crop&w=800&q=80',
+-    title: 'Lß║»p ─æß║╖t bß╗ôn chß╗⌐a n╞░ß╗¢c mß╗¢i',
+-    caption: '─Éß╗Öi kß╗╣ thuß║¡t b├án giao hß╗ç thß╗æng bß╗ôn chß╗⌐a 2000L cho tr╞░ß╗¥ng tiß╗âu hß╗ìc bi├¬n giß╗¢i.',
+-    location: 'Lai Ch├óu',
++    url: 'https://res.cloudinary.com/mczqcagv/image/upload/v1790337423/giveaid/replacement/7R-1890-1405048039_lhirih.webp',
++    publicId: 'giveaid/replacement/7R-1890-1405048039_lhirih',
++    title: 'Installing a New Water Tank',
++    caption: 'Our technical team hands over a 2,000-litre water system to a primary school near the border.',
++    location: 'Lai Chau, Vietnam',
+     category: 'water',
+     layout: 'square',
+-    alt: 'Water pump installation in rural community',
++    alt: 'Water tank installation at a rural primary school',
+   },
+   {
+     id: 'g-016',
+-    url: 'https://images.unsplash.com/photo-1542810634-71277d95dcbb?auto=format&fit=crop&w=800&q=80',
+-    title: 'Trß╗ông 5000 c├óy xanh cho rß╗½ng',
+-    caption: 'Chiß║┐n dß╗ïch phß╗º xanh ─æß╗ôi trß╗ìc tß║íi huyß╗çn Nam ─É├┤ng c├╣ng 200 t├¼nh nguyß╗çn vi├¬n.',
+-    location: 'Thß╗½a Thi├¬n Huß║┐',
++    url: 'https://res.cloudinary.com/mczqcagv/image/upload/v1790337426/giveaid/replacement/A8E-0594-6211-1432085078_cpjudt.webp',
++    publicId: 'giveaid/replacement/A8E-0594-6211-1432085078_cpjudt',
++    title: 'The Joy of Childhood',
++    caption: 'Children share a moment of laughter during an outdoor play session at the community centre.',
++    location: 'Thua Thien Hue, Vietnam',
+     category: 'environment',
+     layout: 'tall',
+-    alt: 'Volunteers planting trees in rural area',
++    alt: 'Children laughing during outdoor play',
+   },
+   {
+     id: 'g-017',
+-    url: 'https://images.unsplash.com/photo-1559027612-cfa6a79a7c91?auto=format&fit=crop&w=1600&q=80',
+-    title: 'Charity Run ΓÇö B╞░ß╗¢c ch├ón v├¼ trß║╗ em',
+-    caption: 'H╞ín 2.000 ng╞░ß╗¥i tham gia ─æ╞░ß╗¥ng chß║íy g├óy quß╗╣ th╞░ß╗¥ng ni├¬n tß║íi c├┤ng vi├¬n L├¬ Thß╗ï Ri├¬ng.',
+-    location: 'TP. Hß╗ô Ch├¡ Minh',
++    url: 'https://res.cloudinary.com/mczqcagv/image/upload/v1790337437/giveaid/replacement/N8H-0077-1-8032-1432085080_xfujn5.webp',
++    publicId: 'giveaid/replacement/N8H-0077-1-8032-1432085080_xfujn5',
++    title: 'Charity Run ΓÇö Steps for Children',
++    caption: 'More than 2,000 runners joined our annual fundraising run at Le Thi Rieng Park.',
++    location: 'Ho Chi Minh City, Vietnam',
+     category: 'events',
+     layout: 'wide',
+     alt: 'Charity fun run event crowd outdoors',
+   },
+   {
+     id: 'g-018',
+-    url: 'https://images.unsplash.com/photo-1517457373958-b7bdd4587205?auto=format&fit=crop&w=800&q=80',
+-    title: '─É├¬m nhß║íc g├óy quß╗╣ "Tiß║┐ng H├ít V├¼ Em"',
+-    caption: 'Gala ├óm nhß║íc vß╗¢i sß╗▒ tham gia cß╗ºa c├íc nghß╗ç s─⌐ nß╗òi tiß║┐ng g├óy quß╗╣ 1.5 tß╗╖ ─æß╗ông.',
+-    location: 'Nh├á h├ít H├▓a B├¼nh, TP.HCM',
++    url: 'https://res.cloudinary.com/mczqcagv/image/upload/v1790337429/giveaid/replacement/A8E-2596-5516-1432085079_xpm8x6.webp',
++    publicId: 'giveaid/replacement/A8E-2596-5516-1432085079_xpm8x6',
++    title: 'Voices for Children Benefit Concert',
++    caption: 'A music gala featuring well-known artists raises 1.5 billion VND for our children programmes.',
++    location: 'Ho Binh Theatre, Ho Chi Minh City',
+     category: 'events',
+     layout: 'square',
+     alt: 'Fundraising gala event with smiling attendees',
+   },
+   {
+     id: 'g-019',
+-    url: 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?auto=format&fit=crop&w=800&q=80',
+-    title: 'X├óy nh├á t├¼nh th╞░╞íng cho hß╗Ö ngh├¿o',
+-    caption: '─Éß╗Öi t├¼nh nguyß╗çn vi├¬n ho├án th├ánh 12 c─ân nh├á trong m├╣a m╞░a b├úo.',
+-    location: 'Quß║úng Nam',
++    url: 'https://res.cloudinary.com/mczqcagv/image/upload/v1790337428/giveaid/replacement/A8E-1590c1-6268-1432085078_rvmhan.webp',
++    publicId: 'giveaid/replacement/A8E-1590c1-6268-1432085078_rvmhan',
++    title: 'Building Homes for Families in Need',
++    caption: 'Volunteer crews complete 12 solidarity homes ahead of the storm season.',
++    location: 'Quang Nam, Vietnam',
+     category: 'community',
+     layout: 'square',
+-    alt: 'Group of volunteers building a rural house',
++    alt: 'Volunteers building a solidarity home',
+   },
+   {
+     id: 'g-020',
+-    url: 'https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?auto=format&fit=crop&w=800&q=80',
+-    title: 'Ph├ít thuß╗æc miß╗àn ph├¡ cho ng╞░ß╗¥i gi├á',
+-    caption: 'Ch╞░╞íng tr├¼nh y tß║┐ cß╗Öng ─æß╗ông ph├ít thuß╗æc cho 300 ng╞░ß╗¥i cao tuß╗òi c├│ ho├án cß║únh kh├│ kh─ân.',
+-    location: '─É├á Nß║╡ng',
++    url: 'https://res.cloudinary.com/mczqcagv/image/upload/v1790337420/giveaid/replacement/21-7928-1405413891_lgjwss.webp',
++    publicId: 'giveaid/replacement/21-7928-1405413891_lgjwss',
++    title: 'Free Medicine for Elderly Communities',
++    caption: 'Our community health programme distributes free medication to 300 elderly people in difficult circumstances.',
++    location: 'Da Nang, Vietnam',
+     category: 'community',
+     layout: 'tall',
+-    alt: 'NGO team distributing medical supplies',
++    alt: 'Community health team distributing free medicine',
+   },
+ ];

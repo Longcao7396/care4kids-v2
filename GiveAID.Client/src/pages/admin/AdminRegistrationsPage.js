@@ -62,7 +62,7 @@ const fmtDate = (iso) => {
 
 function AdminRegistrationsPage() {
   const { user } = useAuth();
-  const canAccess = user?.role === 'Admin' || user?.role === 'SuperAdmin';
+  const canAccess = user?.role === 'Admin';
 
   // Filters
   const [statusFilter, setStatusFilter] = useState('');
