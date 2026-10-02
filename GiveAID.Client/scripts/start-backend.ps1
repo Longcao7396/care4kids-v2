@@ -12,11 +12,10 @@ $ErrorActionPreference = 'Stop'
 
 function Find-V2Root {
     # Strategy 1: walk up from scripts/ looking for the .slnx marker.
-    $cursor = Resolve-Path $PSScriptRoot
+    $cursor = [System.IO.DirectoryInfo]::new($PSScriptRoot)
     for ($i = 0; $i -lt 8; $i++) {
-        if ($cursor.Path -match '[\\/]$') { $cursor = $cursor.Parent }
-        $slnx = Join-Path $cursor.Path 'GiveAID.V2.slnx'
-        if (Test-Path $slnx) { return $cursor.Path }
+        $slnx = Join-Path $cursor.FullName 'GiveAID.V2.slnx'
+        if (Test-Path $slnx) { return $cursor.FullName }
         $parent = $cursor.Parent
         if (-not $parent) { break }
         $cursor = $parent

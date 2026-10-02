@@ -208,12 +208,19 @@ function GalleryFormModal({ show, editing, initial, programmes, onSave, onClose 
   );
 
   return (
-    <Modal show={show} onHide={onClose} size="lg" centered className="admin-modal-dark">
+    <Modal show={show} onHide={onClose} size="lg" centered className="af-form-modal admin-entry-modal">
       <Modal.Header closeButton>
-        <Modal.Title>
-          <i className={`bi ${editing ? 'bi-pencil-square' : 'bi-plus-circle'} me-2 text-accent`}></i>
-          {editing ? 'Edit Gallery Item' : 'Add Gallery Item'}
-        </Modal.Title>
+        <div className="admin-entry-header">
+          <div className="admin-entry-header-icon" aria-hidden="true">
+            <i className={`bi ${editing ? 'bi-pencil-square' : 'bi-plus-circle'}`}></i>
+          </div>
+          <div>
+            <Modal.Title>{editing ? 'Edit Gallery Item' : 'Add Gallery Item'}</Modal.Title>
+            <p className="admin-entry-header-sub">
+              {editing ? 'Update the photo, details, and display settings.' : 'Upload a photo and add details for the gallery.'}
+            </p>
+          </div>
+        </div>
       </Modal.Header>
       <Form onSubmit={handleSubmit}>
         <Modal.Body>
@@ -341,49 +348,23 @@ function GalleryFormModal({ show, editing, initial, programmes, onSave, onClose 
             </Col>
           </Row>
         </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={onClose} disabled={saving}>Cancel</Button>
-          <Button variant="primary" type="submit" disabled={saving}>
+        <Modal.Footer className="admin-entry-footer">
+          <span className="admin-entry-footer-hint">Add a photo URL or upload an image to continue.</span>
+          <div className="admin-entry-footer-actions">
+          <button type="button" className="af-btn af-btn-secondary" onClick={onClose} disabled={saving}>Cancel</button>
+          <button className="af-btn af-btn-primary" type="submit" disabled={saving}>
             {saving ? (
               <><Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" className="me-2" />Saving...</>
             ) : (
               <><i className={`bi ${editing ? 'bi-check-circle' : 'bi-plus-circle'} me-2`}></i>
               {editing ? 'Update Item' : 'Add Item'}</>
             )}
-          </Button>
+          </button>
+          </div>
         </Modal.Footer>
       </Form>
 
       <style>{`
-        .admin-modal-dark .modal-content {
-          background: var(--bg-card);
-          border: 1px solid var(--border-slate);
-          color: var(--text-light);
-        }
-        .admin-modal-dark .modal-header {
-          border-bottom: 1px solid var(--border-slate);
-          background: rgba(56,189,248,0.04);
-        }
-        .admin-modal-dark .modal-footer { border-top: 1px solid var(--border-slate); }
-        .admin-modal-dark .btn-close { filter: invert(1); opacity: 0.5; }
-        .admin-modal-dark .form-label {
-          color: var(--text-light);
-          font-size: 0.875rem;
-          font-weight: 600;
-        }
-        .admin-modal-dark .form-control,
-        .admin-modal-dark .form-select {
-          background: var(--primary-slate);
-          border: 1px solid var(--border-slate);
-          color: var(--text-light);
-        }
-        .admin-modal-dark .form-control:focus,
-        .admin-modal-dark .form-select:focus {
-          border-color: var(--accent-sky);
-          box-shadow: 0 0 0 3px rgba(56,189,248,0.15);
-          background: var(--primary-slate);
-          color: var(--text-light);
-        }
         .gallery-admin-preview { text-align: center; }
       `}</style>
     </Modal>

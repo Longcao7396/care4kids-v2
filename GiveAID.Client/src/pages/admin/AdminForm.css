@@ -686,6 +686,119 @@
   gap: 10px;
 }
 
+/* ── Shared create/edit modal treatment ── */
+.admin-entry-modal .modal-dialog {
+  max-width: 780px;
+  width: calc(100vw - 40px);
+  margin: 1.75rem auto;
+}
+
+.admin-entry-modal .modal-content {
+  border: 0;
+  border-radius: 16px;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.22);
+  overflow: hidden;
+}
+
+.admin-entry-modal .modal-header {
+  padding: 22px 26px 18px;
+  border-bottom: 1px solid var(--c4k-gray-100, #F3F4F6);
+  background: linear-gradient(180deg, #FAFBFC 0%, #FFFFFF 100%);
+  align-items: flex-start;
+}
+
+.admin-entry-modal .modal-header .btn-close { margin-top: 6px; }
+
+.admin-entry-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  width: 100%;
+}
+
+.admin-entry-header-icon {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, rgba(14,116,144,0.10), rgba(231,111,81,0.10));
+  color: var(--c4k-teal-dark, #0A5C73);
+  font-size: 1.15rem;
+}
+
+.admin-entry-modal .modal-title {
+  font-family: var(--font-serif, Georgia, serif);
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--c4k-charcoal, #1A1A1A);
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  margin: 0;
+}
+
+.admin-entry-header-sub {
+  margin: 4px 0 0;
+  font-size: 0.8125rem;
+  color: var(--c4k-gray-600, #4B5563);
+  line-height: 1.45;
+}
+
+.admin-entry-modal .modal-body { padding: 22px 26px 8px; }
+
+.admin-entry-modal .form-label {
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--c4k-charcoal, #1A1A1A);
+  margin-bottom: 5px;
+}
+
+.admin-entry-modal .form-control,
+.admin-entry-modal .form-select {
+  min-height: 40px;
+  padding: 9px 12px;
+  background: #fff;
+  border: 1px solid var(--c4k-gray-300, #D1D5DB);
+  border-radius: 8px;
+  color: var(--c4k-charcoal, #1A1A1A);
+  font-size: 0.875rem;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.admin-entry-modal .form-control:focus,
+.admin-entry-modal .form-select:focus {
+  border-color: var(--c4k-teal, #0E7490);
+  box-shadow: 0 0 0 3px rgba(14, 116, 144, 0.12);
+}
+
+.admin-entry-modal textarea.form-control { min-height: 88px; }
+
+.admin-entry-footer {
+  padding: 16px 26px 20px;
+  border-top: 1px solid var(--c4k-gray-100, #F3F4F6);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  background: #fff;
+}
+
+.admin-entry-footer-hint {
+  font-size: 0.75rem;
+  color: var(--c4k-gray-500, #6B7280);
+}
+
+.admin-entry-footer-actions { display: inline-flex; gap: 10px; flex-shrink: 0; }
+
+@media (max-width: 575px) {
+  .admin-entry-footer-hint { width: 100%; }
+  .admin-entry-footer-actions { width: 100%; justify-content: flex-end; }
+}
+
 /* Form field */
 .af-field { margin-bottom: 16px; }
 .af-field-row { display: grid; gap: 14px; grid-template-columns: 1fr 1fr; }

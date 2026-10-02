@@ -82,12 +82,19 @@ function AchievementFormModal({ show, editing, initial, onSave, onClose }) {
   };
 
   return (
-    <Modal show={show} onHide={onClose} size="lg" centered className="admin-modal-dark">
+    <Modal show={show} onHide={onClose} size="lg" centered className="af-form-modal admin-entry-modal">
       <Modal.Header closeButton>
-        <Modal.Title>
-          <i className={`bi ${editing ? 'bi-pencil-square' : 'bi-plus-circle'} me-2 text-accent`}></i>
-          {editing ? 'Edit achievement' : 'New achievement'}
-        </Modal.Title>
+        <div className="admin-entry-header">
+          <div className="admin-entry-header-icon" aria-hidden="true">
+            <i className={`bi ${editing ? 'bi-pencil-square' : 'bi-plus-circle'}`}></i>
+          </div>
+          <div>
+            <Modal.Title>{editing ? 'Edit achievement' : 'New achievement'}</Modal.Title>
+            <p className="admin-entry-header-sub">
+              {editing ? 'Update the achievement details and visibility.' : 'Record an achievement and the impact it represents.'}
+            </p>
+          </div>
+        </div>
       </Modal.Header>
       <Form onSubmit={handleSubmit}>
         <Modal.Body>
@@ -251,9 +258,11 @@ function AchievementFormModal({ show, editing, initial, onSave, onClose }) {
             </Col>
           </Row>
         </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={onClose} disabled={saving}>Cancel</Button>
-          <Button variant="primary" type="submit" disabled={saving}>
+        <Modal.Footer className="admin-entry-footer">
+          <span className="admin-entry-footer-hint">Fields marked with <span className="af-required">*</span> are required.</span>
+          <div className="admin-entry-footer-actions">
+          <button type="button" className="af-btn af-btn-secondary" onClick={onClose} disabled={saving}>Cancel</button>
+          <button className="af-btn af-btn-primary" type="submit" disabled={saving}>
             {saving ? (
               <><Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" className="me-2" />
               Saving…</>
@@ -261,7 +270,8 @@ function AchievementFormModal({ show, editing, initial, onSave, onClose }) {
               <><i className={`bi ${editing ? 'bi-check-circle' : 'bi-plus-circle'} me-2`}></i>
               {editing ? 'Update' : 'Create'}</>
             )}
-          </Button>
+          </button>
+          </div>
         </Modal.Footer>
       </Form>
     </Modal>
