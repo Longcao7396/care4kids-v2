@@ -142,7 +142,15 @@ function PartnerCard({ item, onView }) {
 function PartnerDetailModal({ item, onClose }) {
   if (!item) return null;
   return (
-    <Modal show onHide={onClose} size="lg" centered className="partner-detail-modal">
+    <Modal
+      show
+      onHide={onClose}
+      size="lg"
+      centered
+      className="partner-detail-modal-backdrop"
+      dialogClassName="partner-detail-modal-dialog"
+      contentClassName="partner-detail-modal-content"
+    >
       <Modal.Header closeButton>
         <Modal.Title className="d-flex align-items-center gap-2">
           <div className="partner-detail-logo">
@@ -444,8 +452,8 @@ function OurPartnersPage() {
         .partner-logo-fallback {
           font-size: 1.4rem;
           font-weight: 800;
-          color: var(--accent-sky);
-          background: linear-gradient(135deg, rgba(56,189,248,0.15), rgba(59,130,246,0.15));
+           color: var(--c4k-teal);
+           background: linear-gradient(135deg, var(--c4k-teal-light), var(--c4k-info-bg));
           width: 100%;
           height: 100%;
           display: flex;
@@ -565,7 +573,7 @@ function OurPartnersPage() {
           height: 48px;
           border-radius: var(--radius-md);
           overflow: hidden;
-          background: var(--primary-slate);
+           background: var(--c4k-gray-100);
           display: flex;
           align-items: center;
           justify-content: center;
@@ -577,20 +585,42 @@ function OurPartnersPage() {
           object-fit: contain;
           padding: 4px;
         }
-        .partner-detail-modal .modal-content {
-          background: var(--bg-card);
-          border: 1px solid var(--border-slate);
-          color: var(--text-light);
+        .partner-detail-modal-dialog {
+          width: calc(100% - 2rem);
+          max-width: 900px;
         }
-        .partner-detail-modal .modal-header {
-          border-bottom: 1px solid var(--border-slate);
+        .partner-detail-modal-content {
+          background: var(--c4k-white);
+          border: 1px solid var(--c4k-gray-200);
+          border-radius: var(--radius-xl);
+          color: var(--c4k-gray-800);
+          box-shadow: var(--shadow-xl);
+          overflow: hidden;
         }
-        .partner-detail-modal .modal-footer {
-          border-top: 1px solid var(--border-slate);
+        .partner-detail-modal-content .modal-header {
+          align-items: center;
+          background: var(--c4k-off-white);
+          border-bottom: 1px solid var(--c4k-gray-200);
+          padding: 1rem 1.25rem;
         }
-        .partner-detail-modal .btn-close {
-          filter: invert(1);
-          opacity: 0.6;
+        .partner-detail-modal-content .modal-title {
+          color: var(--c4k-charcoal);
+          font-family: var(--font-serif);
+          font-size: 1.25rem;
+          line-height: 1.25;
+        }
+        .partner-detail-modal-content .modal-body {
+          max-height: min(60vh, 560px);
+          overflow-y: auto;
+          padding: 1.5rem 1.25rem;
+        }
+        .partner-detail-modal-content .modal-footer {
+          background: var(--c4k-off-white);
+          border-top: 1px solid var(--c4k-gray-200);
+          padding: 0.9rem 1.25rem;
+        }
+        .partner-detail-modal-content .btn-close {
+          opacity: 0.65;
         }
         .partner-detail-grid {
           display: grid;
@@ -598,6 +628,10 @@ function OurPartnersPage() {
           gap: 2rem;
         }
         .partner-detail-meta {
+          background: var(--c4k-gray-50);
+          border: 1px solid var(--c4k-gray-200);
+          border-radius: var(--radius-lg);
+          padding: 1rem;
           display: flex;
           flex-direction: column;
           gap: 0.6rem;
@@ -607,19 +641,20 @@ function OurPartnersPage() {
           align-items: flex-start;
           gap: 0.6rem;
           font-size: 0.9rem;
-          color: var(--text-gray);
+          color: var(--c4k-gray-600);
+          overflow-wrap: anywhere;
         }
         .detail-row i {
-          color: var(--accent-sky);
+          color: var(--c4k-teal);
           font-size: 1rem;
           flex-shrink: 0;
           margin-top: 1px;
         }
-        .detail-row a { color: var(--accent-sky); }
+        .detail-row a { color: var(--c4k-teal); }
         .detail-section { margin-bottom: 1.25rem; }
         .detail-section:last-child { margin-bottom: 0; }
         .detail-section-title {
-          color: var(--text-light);
+          color: var(--c4k-charcoal);
           font-weight: 700;
           margin-bottom: 0.5rem;
           font-size: 0.9rem;
@@ -627,14 +662,21 @@ function OurPartnersPage() {
           letter-spacing: 0.05em;
         }
         .detail-text {
-          color: var(--text-gray);
+          color: var(--c4k-gray-700);
           font-size: 0.925rem;
           line-height: 1.7;
           margin: 0;
         }
 
         @media (max-width: 768px) {
+          .partner-detail-modal-dialog {
+            width: calc(100% - 1rem);
+            margin: 0.5rem auto;
+          }
           .partner-detail-grid { grid-template-columns: 1fr; }
+          .partner-detail-modal-content .modal-body {
+            max-height: calc(100vh - 180px);
+          }
         }
       `}</style>
     </div>
