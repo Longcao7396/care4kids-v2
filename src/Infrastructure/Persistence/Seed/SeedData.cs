@@ -16,17 +16,12 @@ public static class SeedData
         // Ensure database is created
         await context.Database.EnsureCreatedAsync();
 
-        // First-run setup: if no users exist yet, create the canonical admin
-        // and demo accounts. This is intentionally separated from the
-        // per-table idempotent seeding below so that re-running the seeder
-        // on an environment that already has users (but missing some other
-        // reference data — e.g. Organizations) still fills in the missing
-        // tables.
-        if (!await context.Users.AnyAsync())
-        {
-            var passwordHasher = new PasswordHasher();
-            await SeedUsersAsync(context, passwordHasher);
-        }
+        // Always run the user-seeding step. SeedUsersAsync is idempotent
+        // and safe on populated databases: it re-hashes the canonical
+        // admin row only (so documented ADMIN_PASSWORD credentials work
+        // across re-runs) and leaves every other account untouched.
+        var passwordHasher = new PasswordHasher();
+        await SeedUsersAsync(context, passwordHasher);
 
         // Always run the per-table idempotent seeders. Each is keyed on its
         // own natural key (organization name, campaign code, …) so re-runs
@@ -767,8 +762,26 @@ public static class SeedData
     }
 
     /// <summary>
-    /// Seed the canonical admin and demo users on first run.
-    /// SECURITY: passwords come from environment variables (no defaults),
+    /// Seed the canonical admin and demo users.
+    ///
+    /// Behaviour (idempotent, safe for populated databases):
+    ///   • If neither user exists: creates both with the current
+    ///     ADMIN_PASSWORD / DEMO_PASSWORD env-var values.
+    ///   • If the canonical admin (Username = "admin", Email = "admin@give-aid.org")
+    ///     already exists: RE-HASHES its password to the current ADMIN_PASSWORD
+    ///     env-var value. This keeps the documented credential in START.bat
+    ///     (and equivalent ops runbooks) consistent across first-runs and
+    ///     re-runs of the seeder. The hash is the only field touched; FullName,
+    ///     Role, IsActive, IsVerified and CreatedAt are preserved.
+    ///   • If the demo user exists: left untouched (its password was set
+    ///     with whatever DEMO_PASSWORD was at first-run; we do not clobber it).
+    ///   • Any other user accounts (e.g. registered donors, additional
+    ///     admins created at runtime) are NEVER modified by the seeder.
+    ///   • ADMIN_PASSWORD remains required (≥ 8 chars). The check is performed
+    ///     unconditionally so that environments without the env var fail fast
+    ///     rather than silently leaving an un-hashable admin row.
+    ///
+    /// SECURITY: passwords come from environment variables (no defaults);
     /// see the calling site for the validation rules.
     /// </summary>
     private static async Task SeedUsersAsync(GiveAIDDbContext context, PasswordHasher passwordHasher)
@@ -788,6 +801,29 @@ public static class SeedData
         var demoPassword = Environment.GetEnvironmentVariable("DEMO_PASSWORD")
             ?? Guid.NewGuid().ToString("N");
 
+        // Use IgnoreQueryFilters so we also pick up the canonical admin row if
+        // it has been soft-deleted in the past — the operator's intent for
+        // "make ADMIN_PASSWORD work" should win over a stale soft-delete.
+        var existingAdmin = await context.Users
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(u =>
+                u.Username == "admin" &&
+                u.Email == "admin@give-aid.org");
+
+        if (existingAdmin != null)
+        {
+            // Idempotent re-hash: align the canonical admin's stored hash
+            // with whatever ADMIN_PASSWORD is currently configured. This is
+            // the only field we write, and only for the canonical admin —
+            // it does not touch any other account and does not run any
+            // schema-changing operation.
+            existingAdmin.PasswordHash = passwordHasher.Hash(adminPassword);
+            existingAdmin.PasswordChangedAt = DateTime.UtcNow;
+            existingAdmin.UpdatedAt = DateTime.UtcNow;
+            await context.SaveChangesAsync();
+            return;
+        }
+
         var adminUser = new User
         {
             Username = "admin",
@@ -800,19 +836,35 @@ public static class SeedData
             CreatedAt = DateTime.UtcNow
         };
 
-        var demoUser = new User
-        {
-            Username = "demo",
-            Email = "demo@give-aid.org",
-            PasswordHash = passwordHasher.Hash(demoPassword),
-            FullName = "Demo User",
-            Role = "User",
-            IsActive = true,
-            IsVerified = true,
-            CreatedAt = DateTime.UtcNow
-        };
+        // Demo user: only create if it does not already exist. We deliberately
+        // do NOT re-hash an existing demo account (its DEMO_PASSWORD may have
+        // been rotated at runtime).
+        var demoExists = await context.Users
+            .IgnoreQueryFilters()
+            .AnyAsync(u => u.Username == "demo");
 
-        context.Users.AddRange(adminUser, demoUser);
+        var demoUser = demoExists
+            ? null
+            : new User
+            {
+                Username = "demo",
+                Email = "demo@give-aid.org",
+                PasswordHash = passwordHasher.Hash(demoPassword),
+                FullName = "Demo User",
+                Role = "User",
+                IsActive = true,
+                IsVerified = true,
+                CreatedAt = DateTime.UtcNow
+            };
+
+        if (demoUser != null)
+        {
+            context.Users.AddRange(adminUser, demoUser);
+        }
+        else
+        {
+            context.Users.Add(adminUser);
+        }
         await context.SaveChangesAsync();
     }
 
@@ -1030,6 +1082,14 @@ public static class SeedData
     /// <summary>
     /// Seed the demo campaigns, linking them to canonical Causes and
     /// Organizations. Idempotent by <see cref="Campaign.CampaignCode"/>.
+    ///
+    /// DATA-INTEGRITY NOTE: every seeded campaign starts with
+    /// <c>RaisedAmount = 0</c> so that the invariant
+    /// <c>campaigns.raised_amount = SUM(amount WHERE payment_status='Completed' AND is_deleted=0)</c>
+    /// holds from the very first request. The canonical aggregate grows
+    /// through the IAtomicCampaignUpdater flow (Pending -> Completed) and
+    /// can be reconciled with the
+    /// <c>POST /api/v1/campaigns/recalculate-raised-amounts</c> endpoint.
     /// </summary>
     private static async Task SeedCampaignsAsync(GiveAIDDbContext context)
     {
@@ -1073,10 +1133,10 @@ public static class SeedData
                     programmeType: "ChildWelfare",
                     beneficiariesCount: 850,
                     goalAmount: 120000000m,
-                    raisedAmount: 87450000m,
+                    raisedAmount: 0m,
                     status: "Active"),
                 GoalAmount = 120_000_000m,
-                RaisedAmount = 87_450_000m,
+                RaisedAmount = 0m,
                 StartDate = today.AddDays(-30),
                 EndDate = today.AddDays(60),
                 ImageUrl = "https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?auto=format&fit=crop&w=900&q=80",
@@ -1102,10 +1162,10 @@ public static class SeedData
                     programmeType: "Education",
                     beneficiariesCount: 1500,
                     goalAmount: 900000000m,
-                    raisedAmount: 612000000m,
+                    raisedAmount: 0m,
                     status: "Active"),
                 GoalAmount = 900_000_000m,
-                RaisedAmount = 612_000_000m,
+                RaisedAmount = 0m,
                 StartDate = today.AddDays(-14),
                 EndDate = today.AddDays(120),
                 ImageUrl = "https://images.unsplash.com/photo-1497486751825-1233686d5d80?auto=format&fit=crop&w=900&q=80",
@@ -1130,10 +1190,10 @@ public static class SeedData
                     programmeType: "HealthCare",
                     beneficiariesCount: 3000,
                     goalAmount: 450000000m,
-                    raisedAmount: 387500000m,
+                    raisedAmount: 0m,
                     status: "Active"),
                 GoalAmount = 450_000_000m,
-                RaisedAmount = 387_500_000m,
+                RaisedAmount = 0m,
                 StartDate = today.AddDays(-60),
                 EndDate = today.AddDays(30),
                 ImageUrl = "https://images.unsplash.com/photo-1576091160550-2173dba999ef?auto=format&fit=crop&w=900&q=80",
@@ -1160,10 +1220,10 @@ public static class SeedData
                     programmeType: "ChildWelfare",
                     beneficiariesCount: 150,
                     goalAmount: 2500000000m,
-                    raisedAmount: 1750000000m,
+                    raisedAmount: 0m,
                     status: "Active"),
                 GoalAmount = 2_500_000_000m,
-                RaisedAmount = 1_750_000_000m,
+                RaisedAmount = 0m,
                 StartDate = today.AddDays(-90),
                 EndDate = today.AddDays(180),
                 ImageUrl = "https://images.unsplash.com/photo-1542810634-71277d95dcbb?auto=format&fit=crop&w=900&q=80",
@@ -1194,10 +1254,10 @@ public static class SeedData
                     programmeType: "EmergencyRelief",
                     beneficiariesCount: 10000,
                     goalAmount: 3000000000m,
-                    raisedAmount: 2380000000m,
+                    raisedAmount: 0m,
                     status: "Active"),
                 GoalAmount = 3_000_000_000m,
-                RaisedAmount = 2_380_000_000m,
+                RaisedAmount = 0m,
                 StartDate = today.AddDays(-7),
                 EndDate = today.AddDays(45),
                 ImageUrl = "https://images.unsplash.com/photo-1577896851231-70ef18881754?auto=format&fit=crop&w=900&q=80",
@@ -1222,10 +1282,10 @@ public static class SeedData
                     programmeType: "Education",
                     beneficiariesCount: 600,
                     goalAmount: 600000000m,
-                    raisedAmount: 312000000m,
+                    raisedAmount: 0m,
                     status: "Active"),
                 GoalAmount = 600_000_000m,
-                RaisedAmount = 312_000_000m,
+                RaisedAmount = 0m,
                 StartDate = today.AddDays(-45),
                 EndDate = today.AddDays(150),
                 ImageUrl = "https://images.unsplash.com/photo-1497486751825-1233686d5d80?auto=format&fit=crop&w=900&q=80",
@@ -1250,10 +1310,10 @@ public static class SeedData
                     programmeType: "HealthCare",
                     beneficiariesCount: 50,
                     goalAmount: 5000000000m,
-                    raisedAmount: 4150000000m,
+                    raisedAmount: 0m,
                     status: "Active"),
                 GoalAmount = 5_000_000_000m,
-                RaisedAmount = 4_150_000_000m,
+                RaisedAmount = 0m,
                 StartDate = today.AddDays(-180),
                 EndDate = today.AddDays(60),
                 ImageUrl = "https://images.unsplash.com/photo-1509062522246-3755977927d7?auto=format&fit=crop&w=900&q=80",
@@ -1280,10 +1340,10 @@ public static class SeedData
                     programmeType: "ChildWelfare",
                     beneficiariesCount: 5000,
                     goalAmount: 850000000m,
-                    raisedAmount: 510000000m,
+                    raisedAmount: 0m,
                     status: "Active"),
                 GoalAmount = 850_000_000m,
-                RaisedAmount = 510_000_000m,
+                RaisedAmount = 0m,
                 StartDate = today.AddDays(-30),
                 EndDate = today.AddDays(120),
                 ImageUrl = "https://images.unsplash.com/photo-1503454537195-1dcabb73ffb9?auto=format&fit=crop&w=900&q=80",

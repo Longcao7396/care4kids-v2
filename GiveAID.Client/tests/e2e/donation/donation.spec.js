@@ -107,10 +107,10 @@ test.describe('Donation — happy path', () => {
     /* Default paymentMethod is BankTransfer. */
     await expect(donate.paymentMethod).toHaveValue('BankTransfer');
     await donate.submitForm();
-    /* The success alert says "Thank you for your generous donation…". */
+    /* The redirect flow lands on the English PaymentMockConfirmPage;
+     * confirming it surfaces the Care4Kids "Thank you" banner on the
+     * PaymentResultPage that follows. */
     await donate.expectSuccess();
-    /* The component auto-navigates to /my-donations after 2s. */
-    await expect(page).toHaveURL(/\/my-donations$/, { timeout: 15_000 });
   });
 });
 
@@ -123,12 +123,14 @@ test.describe('Donation — anonymous donation toggle', () => {
     /* The custom checkbox styling puts a <span> over the real <input>.
      * Use force:true to bypass the visibility/stability checks. */
     await donate.anonymous.check({ force: true });
+    /* Submission must succeed — same redirect-based flow as the happy
+     * path: /donate -> /payment/mock-confirm (English copy) ->
+     * /payment/result -> English "Thank you" banner. Following the full
+     * flow also proves the anonymous flag is accepted by the backend
+     * and not blocked by client-side validation. */
     await donate.submitForm();
-    /* Submission must succeed (or surface a 429 from the backend rate
-     * limiter under heavy parallel load — both prove the form is
-     * accepting the anonymous flag and not blocked). */
-    await expect(donate.alert.first()).toBeVisible({ timeout: 30_000 });
-    const alertText = (await donate.alert.first().textContent()) || '';
-    expect(alertText).toMatch(/thank you|rate.?limit|too many|429|request failed/i);
+    await donate.expectOnMockConfirmPage();
+    await donate.confirmMockPayment();
+    await donate.expectThankYouOnResultPage();
   });
 });

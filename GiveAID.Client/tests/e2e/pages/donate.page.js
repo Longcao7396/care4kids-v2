@@ -93,10 +93,41 @@ class DonatePage {
   }
 
   async expectSuccess() {
+    /* The donate form redirects to the mock-confirm page after a
+     * successful POST. We must follow the redirect, click Confirm,
+     * and then verify the result page shows the English "Thank you"
+     * banner that the Care4Kids UX exposes on Completed status. */
+    await this.expectOnMockConfirmPage();
+    await this.confirmMockPayment();
+    await this.expectThankYouOnResultPage();
+  }
+
+  async expectOnMockConfirmPage() {
     /* Allow generous timeout — under parallel load the donation POST can
      * take longer to round-trip (the rate-limit window is 100/min/IP
      * shared across the test suite). */
-    await expect(this.alert.first()).toContainText(/thank you/i, { timeout: 30_000 });
+    await this.page.waitForURL(/\/payment\/mock-confirm/, { timeout: 30_000 });
+    /* The English info copy should be visible. */
+    await expect(
+      this.page.getByText(/confirm payment/i).first()
+    ).toBeVisible({ timeout: 10_000 });
+  }
+
+  async confirmMockPayment() {
+    /* Click the green "Confirm payment" button rendered by
+     * PaymentMockConfirmPage. We assert the English UX string. */
+    const btn = this.page.getByRole('button', { name: /confirm payment/i });
+    await expect(btn).toBeVisible({ timeout: 10_000 });
+    await btn.click();
+    await this.page.waitForURL(/\/payment\/result/, { timeout: 15_000 });
+  }
+
+  async expectThankYouOnResultPage() {
+    /* The Completed banner on the result page carries the Care4Kids
+     * English "Thank you" copy. */
+    await expect(
+      this.page.getByRole('heading', { name: /thank you/i }).first()
+    ).toBeVisible({ timeout: 30_000 });
   }
 }
 
